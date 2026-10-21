@@ -348,10 +348,11 @@ function ConflictSwitch({ conflicts, picks = {}, chess, golden, onPick }) {
 }
 
 function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset, locked, level = 'normal', onLevel, notOwned = false, conflict = {}, conflicts = undefined, onConflict = null }) {
+  const [tab, setTab] = useState('skill');
   const [statLevel, setStatLevel] = useState('elite'); // 局内数值: the 精锐 shows the chosen module's effect
   const setLevel = onLevel;
   const bodyRef = useRef(null);
-  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0; }, [chess?.chessId]);
+  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = 0; }, [chess?.chessId, tab]);
   if (!chess) return html`<aside class="lo-detail lo-detail--empty"><p class="t-dim">${t('没有符合条件的干员')}</p></aside>`;
   const opt = chessOptions(chess, golden);
   const choice = effectiveChoice(entries, chess, golden);
@@ -359,6 +360,7 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
   const changed = choice.changed || cv.changed;
   const modOpt = opt.moduleOptions.find((x) => x.id === choice.module) || null;
   const lv = (c) => c?.status?.skillLevel ?? '—';
+  const activeTab = tab === 'mod' && !golden ? 'skill' : tab;
   return html`<aside class="lo-detail" aria-label=${t('{name} 调配', { name: chess.name })}>
     <div class="lo-dhead">
       <div class=${cx('lo-dhead__art', `lo-dhead__art--t${chess.tier}`)}>
@@ -380,12 +382,16 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
       <span class="mod-host" data-mod-slot="screen.loadout.card" data-mod-slot-key=${chess.chessId}></span>
     </div>
     ${onConflict ? html`<${ConflictSwitch} conflicts=${conflicts} picks=${conflict} chess=${chess} golden=${golden} onPick=${onConflict} />` : null}
+    <div class="lo-dtabs" role="tablist" aria-label=${t('调配项目')}>
+      ${[['skill', t('技能'), 'SKILL'], ['mod', t('模组'), 'MODULE'], ['stats', t('数值'), 'STATS'], ['voice', t('语音'), 'VOICE'], ['skin', t('换装'), 'SKIN'], ['growth', t('培养'), 'GROWTH']]
+        .filter(([key]) => key !== 'mod' || !!golden).map(([key, label, en]) => html`<button key=${key} type="button" role="tab" aria-selected=${activeTab === key ? 'true' : 'false'}
+          class=${cx('lo-dtab', activeTab === key && 'is-on')} onClick=${() => setTab(key)}>${label} <span class="lo-dtab__en num">${en}</span></button>`)}
+    </div>
     <div class="lo-detail__body" ref=${bodyRef}>
-      <${OperatorVoice} charId=${chess.charId} />
-      <${SkinSection} charId=${chess.charId} />
-      <${CultivationSection} charId=${chess.charId} ops=${ops} onSet=${onOps} standIn=${notOwned} />
-      <${LoadoutGarrisons} chess=${level === 'elite' && golden ? golden : chess} m=${m} />
-      <section class="lo-sec">
+      ${activeTab === 'voice' ? html`<${OperatorVoice} charId=${chess.charId} />` : null}
+      ${activeTab === 'skin' ? html`<${SkinSection} charId=${chess.charId} />` : null}
+      ${activeTab === 'growth' ? html`<${CultivationSection} charId=${chess.charId} ops=${ops} onSet=${onOps} standIn=${notOwned} />` : null}
+      ${activeTab === 'skill' ? html`<section class="lo-sec">
         <header class="lo-sec__head">
           <h3>${t('技能')}<${MicroLabel}>SKILL<//></h3>
           <div class="lo-seg" role="tablist" aria-label=${t('技能等级')}>
@@ -397,9 +403,10 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
           ${opt.skillOptions.map((s) => html`<${SkillOption} key=${s.index} m=${m} opt=${s} level=${level} on=${s.index === choice.skill}
             onPick=${(i) => onChange({ skill: i })} />`)}
         </div>
-      </section>
-      <${LoadoutStats} base=${chess} golden=${golden} entries=${entries} ops=${ops} level=${statLevel} onLevel=${setStatLevel} />
-      ${golden ? html`<section class="lo-sec lo-sec--mod">
+      </section>` : null}
+      ${activeTab === 'stats' ? html`<${LoadoutGarrisons} chess=${level === 'elite' && golden ? golden : chess} m=${m} />
+        <${LoadoutStats} base=${chess} golden=${golden} entries=${entries} ops=${ops} level=${statLevel} onLevel=${setStatLevel} />` : null}
+      ${activeTab === 'mod' && golden ? html`<section class="lo-sec lo-sec--mod">
         <header class="lo-sec__head">
           <h3>${t('模组')}<${MicroLabel}>MODULE<//></h3>
           <span class="lo-sec__note">${t('仅精锐干员装备 · 模组等级')} <b class="num">${golden.status?.equipLevel ?? 1}</b></span>

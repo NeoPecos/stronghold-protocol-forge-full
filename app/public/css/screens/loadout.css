@@ -277,6 +277,29 @@
 .lo-bond__dot { width: .1rem; height: .1rem; border-radius: 50%; background: var(--mint-700); }
 .lo-dhead__reset { position: absolute; right: .12rem; top: .12rem; }
 
+/* Operator detail categories, matching the main server's left-hand selector. */
+.lo-dtabs {
+  flex: none; display: flex; align-items: stretch;
+  background: rgba(0, 0, 0, .45); border-bottom: 1px solid var(--line-2);
+}
+.lo-dtab {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: .05rem;
+  height: max(.42rem, 30px); padding: 0 .06rem;
+  font: inherit; font-size: max(.15rem, 11px); font-weight: 700; color: var(--text-lo);
+  background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+  touch-action: manipulation;
+}
+.lo-dtab:hover { color: var(--text-hi); background: rgba(255, 255, 255, .03); }
+.lo-dtab.is-on {
+  color: var(--mint-400); border-bottom-color: var(--mint-400);
+  background: linear-gradient(180deg, transparent, rgba(78, 216, 175, .09));
+}
+.lo-dtab__en {
+  font-family: var(--font-num); font-size: max(.11rem, 8px); color: var(--text-dim); letter-spacing: .06em;
+}
+.lo-dtab.is-on .lo-dtab__en { color: rgba(78, 216, 175, .7); }
+
 /* 干员冲突兼容 (2026-10-16): the pack switch under the detail header — one row per chess record with more than one
    source (the operator and, when it differs, its 精锐 record). Only rendered when such a conflict exists. */
 .lo-cf { flex: none; display: flex; flex-direction: column; gap: .06rem; padding: .1rem .18rem; background: rgba(255, 255, 255, .03); border-bottom: 1px solid var(--line); }
