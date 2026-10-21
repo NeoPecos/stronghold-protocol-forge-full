@@ -24,10 +24,10 @@ export const DLC_PACKS = Object.freeze([
     '源石辅助仪、沙盘 α、沙盘 β、同行者四件装备，以及相关角色数据调整。',
   ] },
   { id: 'dossoles', name: '多索雷斯', detail: '假日盟约与水蚀机制', requires: ['side-story'], contents: [
-    '多索雷斯假日故事集盟约及假日威龙陈、林、羽毛笔、龙舌兰四名干员。',
+    '多索雷斯假日盟约及假日威龙陈、林、羽毛笔、龙舌兰四名干员。',
     '水蚀地形、侵蚀损伤、敌人减速与侵蚀爆发后的持续伤害。',
     '六件知名商品标志物装备，由龙舌兰的特质提供。',
-    '需要故事集规则包；开启本 DLC 时会一并开启故事集。',
+    '开启本 DLC 时会自动加载故事集盟约所需的公共规则，无须单独设置。',
   ] },
   { id: 'side-story', name: '故事集', detail: '故事集盟约的公共规则', contents: [
     '故事集盟约类型与禁用抽签规则，并处理专属干员的本局禁用。',
@@ -38,6 +38,8 @@ export const DLC_PACKS = Object.freeze([
 ]);
 
 export const DLC_IDS = new Set(DLC_PACKS.map((pack) => pack.id));
+// side-story only supplies rules for Dossoles. It is not selectable content.
+export const selectableDlcIds = (ids) => enabledDlcIds(ids).filter((id) => id !== 'side-story');
 export const enabledDlcIds = (ids) => DLC_PACKS.filter((pack) => ids?.includes(pack.id)).map((pack) => pack.id);
 export const basePackIds = (catalogue) => (Array.isArray(catalogue) ? catalogue : [])
   .map((pack) => pack?.id).filter((id) => typeof id === 'string' && !DLC_IDS.has(id));

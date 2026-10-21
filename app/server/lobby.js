@@ -184,7 +184,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, maxSeatsFrom, clampSeats, RECON } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkConflictPicks, checkDiyPicks, charPotentialChanges, PACK_MSG_LIMITS, CHAT_LIMITS } from '../shared/protocol.js';
 import { modSetOf, isModId, modSetDrift } from '../shared/modIdentity.js';
-import { DLC_IDS, basePackIds, enabledDlcIds } from '../shared/dlc.js';
+import { DLC_IDS, basePackIds, enabledDlcIds, selectableDlcIds } from '../shared/dlc.js';
 import { normalizeSupportConfig, checkSupport, supportPicker, supportCapacity, supportTiers } from '../shared/support.js';
 import { checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
@@ -642,7 +642,7 @@ export class Room {
         : null)),
       spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(this.modded ? { content: s.content || 'loading' } : {}) })),
       ...(this.modSet ? { mods: this.modSet } : {}),
-      ...(this.dlcAvailable ? { dlc: { available: this.dlcAvailable, enabled: this.dlcIds } } : {}),
+      ...(this.dlcAvailable ? { dlc: { available: this.dlcAvailable, enabled: selectableDlcIds(this.dlcIds) } } : {}),
       // 房间的 Fever 音乐（颂乐人偶）：没设过就不带这个键 —— 与从前逐字节相同。
       ...(this.feverMusic ? { feverMusic: this.feverMusic } : {}),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
@@ -1007,7 +1007,7 @@ export class Lobby {  /**
           maxSeats: r.seatCap,
           inMatch: !!r.match,
           hostName: host ? host.name : null,
-          ...(r.dlcAvailable ? { dlcIds: r.dlcIds } : {}),
+          ...(r.dlcAvailable ? { dlcIds: selectableDlcIds(r.dlcIds) } : {}),
         };
       });
     return { ok: true, online, roomsCount: rooms.length, matchesCount: rooms.filter((r) => r.inMatch).length, rooms };
@@ -1036,7 +1036,7 @@ export class Lobby {  /**
         inMatch: false,
         pluginCount: room.content?.plugins?.length || 0,
         modded: room.modded,
-        ...(room.dlcAvailable ? { dlcIds: room.dlcIds } : {}),
+        ...(room.dlcAvailable ? { dlcIds: selectableDlcIds(room.dlcIds) } : {}),
       });
     }
     return rooms;
@@ -1503,7 +1503,7 @@ export class Lobby {  /**
     const catalogue = this.workshop?.mods || [];
     const baseIds = basePackIds(catalogue);
     const installed = catalogue.map((pack) => pack.id);
-    const dlcAvailable = enabledDlcIds(installed).filter((id) => id !== 'dossoles' || installed.includes('side-story'));
+    const dlcAvailable = selectableDlcIds(installed).filter((id) => id !== 'dossoles' || installed.includes('side-story'));
     const dlcManaged = baseIds.length > 0 && dlcAvailable.length > 0;
     const resolved = resolveRoomModSet(dlcManaged ? baseIds : [], catalogue);
     if (!resolved.ok) {
@@ -2026,7 +2026,7 @@ export class Lobby {  /**
     if (refused) return refused;
     // 多索雷斯的故事集盟约依赖 side-story 的抽签、简报与结算规则。
     const chosen = on ? [...room.dlcIds, id, ...(id === 'dossoles' ? ['side-story'] : [])]
-      : room.dlcIds.filter((entry) => entry !== id && !(id === 'side-story' && entry === 'dossoles'));
+      : room.dlcIds.filter((entry) => entry !== id && !(id === 'dossoles' && entry === 'side-story'));
     const nextDlc = enabledDlcIds(chosen);
     if (nextDlc.length === room.dlcIds.length && nextDlc.every((entry, index) => entry === room.dlcIds[index])) return OK;
     const resolved = resolveRoomModSet([...basePackIds(this.workshop?.mods), ...nextDlc], this.workshop?.mods);

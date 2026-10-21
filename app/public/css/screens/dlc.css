@@ -7,6 +7,9 @@
 .dlc-page__body { max-width: 1050px; margin: auto; padding: 22px 24px; }
 .dlc-page__intro,.dlc-page__note { color: #b8d2c9; line-height: 1.6; }
 .dlc-page__grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,300px),1fr)); gap: 12px; margin: 18px 0; }
+.dlc-page__story { margin-top: 28px; padding-top: 18px; border-top: 1px solid #31554d; }
+.dlc-page__story h2 { margin: 0 0 5px; color: #69cdb5; font-size: 20px; }
+.dlc-page__story p { margin: 0; color: #adc8be; font-size: 13px; line-height: 1.5; }
 .dlc-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 116px; padding: 16px; border: 1px solid #365249; background: #14201e; }
 .dlc-card.is-on { border-color: #44d4ae; background: #18332b; }
 .dlc-card h2 { margin: 5px 0; font-size: 21px; line-height: 1.25; }
