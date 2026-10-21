@@ -613,6 +613,12 @@ docs/WORKSHOP.md §1.9.3 / DESIGN §28.9）是**一次性**的：点错了、或
 * **面板也能发这一条**：`PANEL_SEND_TYPES`（`public/js/ui/extensions.js`）多了 `room.mods` —— 面板能不能发它是**闭
   枚举**说了算，而 `room.create` **不在**里面（面板能改对局状态的那一天，就是这一层失效的那一天）。
 
+### 1.9d a5 房间 DLC 管理页
+
+a5 从服务器已装的包中，将颂乐人偶、雷姆必拓、东国、哥伦比亚、多索雷斯、故事集列为六项独立 DLC。新房间默认关闭全部 DLC，但保留其余公共功能和外观包。房间顶栏的「DLC 管理」打开独立页面；房主可逐项发 `room.setDlc { id, on }`，服务端据此重新物化房间数据、kit 与模块。客户端不能通过 `room.create.modIds` 或 `room.mods` 绕开该页设置。
+
+只有已安装的 DLC 能切换；对局中或任一真人已准备时返回 `MOD_SET_LOCKED`。变更后其他真人退回未准备并须重新确认当前 DLC 集合，房主自动确认。无 DLC 的房间不要求额外确认。`room.state.dlc` 带可用和已启用的包 id；房间列表和公开招募带 `dlcIds`，只有非空时标为「DLC 房间」。旧页面忽略这些附加字段。
+
 ---
 
 ## 2. Effect registry (content API)

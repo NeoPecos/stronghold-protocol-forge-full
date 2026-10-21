@@ -52,6 +52,7 @@ import { hasScriptConsent, rememberScriptConsent } from '../content.js';
 import { SupportButton } from './support.js';
 import { modComponent } from '../ui/modComponents.js';
 import { ChatPanel } from './chat.js';
+import { DlcPage } from './dlc.js';
 import * as roomMods from '../roomMods.js';
 import { roomModsOf, shortDigest, currentModSet } from '../roomMods.js';
 import { loadCatalog, planAlignment, alignRoom, missingPackIds, storeFor } from '../mods/align.js';
@@ -732,6 +733,7 @@ export function RoomScreen() {
   const [busy, setBusy] = useState(null);
   const [picker, setPicker] = useState(false);
   const [opts, setOpts] = useState(false);
+  const [dlcPage, setDlcPage] = useState(false);
   const [searchWant, setSearchWant] = useState(false); // the host asked to search and has not stopped
   const [searchSince, setSearchSince] = useState(0);
   const [found, setFound] = useState(false);
@@ -961,7 +963,9 @@ export function RoomScreen() {
           <b>${modeName}<span class="rs-clock__sep"></span>${t('同盟已等待')} <span class="num">${clock((Date.now() - since) / 1000)}</span></b>
           <span>${t('当前延迟')}<b class=${`num rs-ping rs-ping--${!online || !Number.isFinite(conn.ping) ? 'off' : conn.ping < 60 ? 'low' : conn.ping < 200 ? 'mid' : 'high'}`}>${online && Number.isFinite(conn.ping) ? Math.round(conn.ping) : '--'}</b>ms</span>
         </div>
+        ${room.dlc ? html`<button type="button" class="rs-dlc-entry rs-dlc-entry--compact" aria-label=${t('DLC 管理')} onClick=${() => setDlcPage(true)}>DLC${room.dlc.enabled.length ? ` · ${room.dlc.enabled.length}` : ''}</button>` : null}
         <div class="rs-tools">
+          ${room.dlc ? html`<button type="button" class="rs-dlc-entry" onClick=${() => setDlcPage(true)}>${t('DLC 管理')}${room.dlc.enabled.length ? ` · ${room.dlc.enabled.length}` : ''}</button>` : null}
           <${Button} variant="secondary" size="sm" square=${true} icon="chart" class="stats-entry" onClick=${openStats} title=${t('统计数据')} aria-label=${t('统计数据')} />
           ${coop && !openFriends.unavailable ? html`<${Button} variant="secondary" size="sm" square=${true} icon="users" class="rs-friends" onClick=${() => openFriends()} title=${t('好友 · 邀请好友加入')} aria-label=${t('好友')} />` : null}
           <${SettingsButton} class="room-settings" variant="secondary" square=${true} />
@@ -1067,6 +1071,7 @@ export function RoomScreen() {
     ${foundShown ? html`<${FoundPanel} class=${foundLeaving ? 'is-leaving' : ''} seats=${facts.seats.length} text=${t('同盟集结完毕')} />` : null}
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${m} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
     ${protoShown ? html`<${RoomProtocol} room=${room} variant=${variant} busy=${busy} onClose=${() => setPicker(false)} onPick=${setDifficulty} leaving=${protoLeaving} />` : null}
+    ${dlcPage && room.dlc ? html`<${DlcPage} room=${room} myId=${me.playerId} onClose=${() => setDlcPage(false)} />` : null}
   </div>`;
 }
 

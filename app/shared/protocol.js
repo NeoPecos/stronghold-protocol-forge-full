@@ -845,6 +845,7 @@ export const C2S = {
   // the co-op room option 「AI 队友最后选择」 (GitHub #338; host, before the match): the strategy and 机变 drafts order every
   // human seat before every AI seat (server/match/match/phases.js humansFirst); room.state.aiPicksLast
   'room.setAiPicksLast': { on: isBool },
+  'room.setDlc': { id: (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v), on: isBool },
   // 房间内改本房间的**模组集合**（G1；docs/WORKSHOP.md §1.9.3）：房主、开局前、且**没有任何真人已就绪**时，
   // 把这一房声明的集合换成另一个（`[]` = 改回「不声明」，即跑服务器加载的全部）。形状与 `room.create.modIds`
   // **逐字同形**（同一格的判据、同一个 `MAX_ROOM_MODS` 上限）—— 一条声明两处写法就是两个会漂的真相。

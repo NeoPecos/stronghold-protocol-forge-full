@@ -4536,3 +4536,7 @@ v1.<base64url(载荷 JSON)>.<base64url(HMAC-SHA256(secret, "v1." + <载荷>))>
 **判据**：`test/modDeclPreHandshake.test.mjs`（同一次装载下端点的 JSON 与 `welcome.modPanels` 逐键相等；
 无包的干净安装上 404；客户端 `apply` 同一份清单两次不重复挂载 / 不重建 DOM；`fetch` 失败静默）；`mods.panels`
 那一行写在 `docs/MOD-SURFACE.md`（B 层）。
+
+## a5 deployment: room DLC selection (2026-10-22)
+
+The a5 deployment exposes six installed gameplay packs individually in a separate room DLC page. A new room declares the seven remaining utility and appearance packs, then `room.setDlc { id, on }` adds or removes one gameplay pack. The server materialises the exact room set before broadcasting it, so the selected data, kits, and battle modules agree. Host-only changes are locked after a match starts or a human readies; another human must re-consent to a changed set. Public room summaries carry enabled DLC ids for the recruiting badge. This deployment-specific rule supersedes the generic `room.create.modIds` / `room.mods` picker described above on a5; those player-facing paths stay disabled there.

@@ -184,6 +184,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, maxSeatsFrom, clampSeats, RECON } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkConflictPicks, checkDiyPicks, charPotentialChanges, PACK_MSG_LIMITS, CHAT_LIMITS } from '../shared/protocol.js';
 import { modSetOf, isModId, modSetDrift } from '../shared/modIdentity.js';
+import { DLC_IDS, basePackIds, enabledDlcIds } from '../shared/dlc.js';
 import { normalizeSupportConfig, checkSupport, supportPicker, supportCapacity, supportTiers } from '../shared/support.js';
 import { checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
@@ -445,6 +446,8 @@ export class Room {
     this.aiBands = {};
     this.allowSpectators = true;
     this.recruitWanted = true;
+    this.dlcAvailable = null;
+    this.dlcIds = [];
     this.inviteOnly = false;
     this.invited = new Set();
     this.extendedUnite = mode === 'coop' && seatCap > DEFAULT_SEATS;
@@ -633,11 +636,13 @@ export class Room {
           // 外观选择（皮肤层）：**别人看到的你** —— `{ picks?, avatar? }`（见 `appearance()`）。
           // 只有选过才有这个键 —— 一个没换装的房间与从前逐字节相同。
           ...(s.appearance && Object.keys(s.appearance).length ? { appearance: s.appearance } : {}),
+          ...(this.dlcAvailable && !s.isBot ? { dlcConsent: !this.dlcIds.length || s.modConsent === this.modSet?.digest } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.modded && !s.isBot ? { content: s.content || 'loading' } : {}) }
         : null)),
       spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(this.modded ? { content: s.content || 'loading' } : {}) })),
       ...(this.modSet ? { mods: this.modSet } : {}),
+      ...(this.dlcAvailable ? { dlc: { available: this.dlcAvailable, enabled: this.dlcIds } } : {}),
       // 房间的 Fever 音乐（颂乐人偶）：没设过就不带这个键 —— 与从前逐字节相同。
       ...(this.feverMusic ? { feverMusic: this.feverMusic } : {}),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
@@ -1002,6 +1007,7 @@ export class Lobby {  /**
           maxSeats: r.seatCap,
           inMatch: !!r.match,
           hostName: host ? host.name : null,
+          ...(r.dlcAvailable ? { dlcIds: r.dlcIds } : {}),
         };
       });
     return { ok: true, online, roomsCount: rooms.length, matchesCount: rooms.filter((r) => r.inMatch).length, rooms };
@@ -1030,6 +1036,7 @@ export class Lobby {  /**
         inMatch: false,
         pluginCount: room.content?.plugins?.length || 0,
         modded: room.modded,
+        ...(room.dlcAvailable ? { dlcIds: room.dlcIds } : {}),
       });
     }
     return rooms;
@@ -1205,6 +1212,7 @@ export class Lobby {  /**
       // 内容由服务器固定，房主不能改包；Fever 音乐仍可设置。
       case 'room.mods':
         return fail(ERR.MOD_SET_LOCKED, 'this server runs a fixed mod set; rooms cannot change it');
+      case 'room.setDlc': return this.setRoomDlc(session, msg);
       case 'room.feverMusic': return this.setFeverMusic(session, msg);
       case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
@@ -1490,8 +1498,14 @@ export class Lobby {  /**
     // The room's own set (W-A, DESIGN §28.9): every id must name a pack THIS server loaded, and the refusal names both
     // what was not found and what is on offer — a client cannot guess its way into a set the server cannot run. Absent
     // or `[]` = today's behaviour (the room declares nothing and `room.state` gets no `mods`).
-    // 本服务器内容固定：忽略客户端声明的 modIds，房间恒按服务器已加载的全部模组运行。
-    const resolved = resolveRoomModSet([], this.workshop?.mods);
+    // Public a5 rooms start with utility/appearance packs only. Each gameplay
+    // pack is selected later in the room's DLC page, never through modIds.
+    const catalogue = this.workshop?.mods || [];
+    const baseIds = basePackIds(catalogue);
+    const installed = catalogue.map((pack) => pack.id);
+    const dlcAvailable = enabledDlcIds(installed).filter((id) => id !== 'dossoles' || installed.includes('side-story'));
+    const dlcManaged = baseIds.length > 0 && dlcAvailable.length > 0;
+    const resolved = resolveRoomModSet(dlcManaged ? baseIds : [], catalogue);
     if (!resolved.ok) {
       const unknown = resolved.unknown.length ? resolved.unknown.join(', ') : '(none)';
       const available = resolved.available.length ? resolved.available.join(', ') : '(none)';
@@ -1549,6 +1563,7 @@ export class Lobby {  /**
       devStage = stage;
     }
     const room = new Room(code, mode, difficulty, this.now(), roomCap);
+    if (dlcManaged) room.dlcAvailable = dlcAvailable;
     // 开发者模式：这一局跳过 INFO_CHECK / BAND_DRAFT（见 server/match/match/phases.js skipToBattle），并强制打 devStage
     room.dev = devOn;
     room.devStage = devStage;
@@ -1613,7 +1628,7 @@ export class Lobby {  /**
     // 早退也要先判同意。
     if (cur === room && !room.spectatorOf(session.playerId)) {
       const seat = room.seatOf(session.playerId);
-      if (room.modSet && seat && seat.modConsent !== room.modSet.digest) {
+      if (room.modSet && seat && seat.modConsent !== room.modSet.digest && (!room.dlcAvailable || room.dlcIds.length)) {
         if (consent !== true) return this.modConsentRefusal(room, seat);
         seat.modConsent = room.modSet.digest;
         this.log.info(`[lobby] ${room.code} ${session.name} agreed to the room's mod set (${room.modSet.digest.slice(0, 12)}…)`);
@@ -1628,7 +1643,7 @@ export class Lobby {  /**
     // 每名真人须同意（W7, DESIGN §28.53）：**占了玩家座位**就要先对**这一份**字节表态。判在占座**之前**，所以
     // 没同意的人进不去（不是「进来了但只能看着」）。AI 与观战者不在这一条线上（他们走不到这里：AI 由 `addBot`
     // 建座位，观战者走 `spectate`）。
-    if (room.modSet && consent !== true) {
+    if (room.modSet && consent !== true && (!room.dlcAvailable || room.dlcIds.length)) {
       return fail(ERR.MOD_CONSENT_REQUIRED,
         `this room declares the mod set (${room.modSet.packs.map((p) => p.id).join(', ')} · ${room.modSet.digest.slice(0, 12)}…) — send "consent": true with room.join to enter it`);
     }
@@ -2002,6 +2017,39 @@ export class Lobby {  /**
    * @param {import('./net.js').Session} session
    * @param {{ modIds: string[] }} msg
    */
+  setRoomDlc(session, { id, on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (!room.dlcAvailable || !room.dlcAvailable.includes(id) || !DLC_IDS.has(id)) return fail(ERR.MOD_UNKNOWN, `DLC not installed: ${id}`);
+    const refused = this.roomModsRefusal(room);
+    if (refused) return refused;
+    // 多索雷斯的故事集盟约依赖 side-story 的抽签、简报与结算规则。
+    const chosen = on ? [...room.dlcIds, id, ...(id === 'dossoles' ? ['side-story'] : [])]
+      : room.dlcIds.filter((entry) => entry !== id && !(id === 'side-story' && entry === 'dossoles'));
+    const nextDlc = enabledDlcIds(chosen);
+    if (nextDlc.length === room.dlcIds.length && nextDlc.every((entry, index) => entry === room.dlcIds[index])) return OK;
+    const resolved = resolveRoomModSet([...basePackIds(this.workshop?.mods), ...nextDlc], this.workshop?.mods);
+    if (!resolved.ok || !resolved.modSet) return fail(ERR.MOD_UNKNOWN, `cannot build DLC set: ${id}`);
+    const hooks = (this.workshop?.roomHooks || []).filter((entry) => entry && typeof entry.install === 'function').map((entry) => entry.id);
+    const currentHooks = hooks.filter((entry) => room.modIds?.includes(entry)).sort();
+    const nextHooks = hooks.filter((entry) => resolved.modIds.includes(entry)).sort();
+    if (currentHooks.join(',') !== nextHooks.join(',')) return fail(ERR.MOD_SET_LOCKED, `${id} has room hooks and cannot be switched after room creation`);
+    const late = this.roomModsRefusal(room);
+    if (late) return late;
+    this.dropReplay(room, session.playerId);
+    this.workshop.roomAssets.forRoom(resolved.modSet);
+    room.modIds = resolved.modIds;
+    room.modSet = resolved.modSet;
+    room.dlcIds = nextDlc;
+    for (const seat of room.seats) if (seat && !seat.isBot && seat.playerId !== room.hostId) { seat.ready = false; seat.modConsent = null; }
+    const host = room.seatOf(room.hostId);
+    if (host) host.modConsent = room.modSet.digest;
+    this.log.info(`[lobby] ${room.code} DLC ${id} ${on ? 'enabled' : 'disabled'} by ${session.name}`);
+    this.broadcastState(room);
+    return OK;
+  }
+
   setRoomMods(session, { modIds }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -2148,6 +2196,7 @@ export class Lobby {  /**
    */
   modConsentRefusal(room, seat) {
     if (!room || !room.modSet) return null;
+    if (room.dlcAvailable && !room.dlcIds.length) return null;
     if (!seat || seat.isBot) return null;
     if (seat.modConsent === room.modSet.digest) return null;
     return fail(ERR.MOD_CONSENT_REQUIRED,

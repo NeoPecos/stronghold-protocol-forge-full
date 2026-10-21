@@ -445,6 +445,7 @@ function RecruitCard({ rooms, online, onJoin, onAll, onCreate }) {
               <${DifficultyIcon} difficulty=${r.difficulty} class="diff-glyph" />
               <span>${DIFFICULTY_NAMES[r.difficulty] ? t(DIFFICULTY_NAMES[r.difficulty]) : r.difficulty}</span>
               ${r.random ? html`<span class="hub-recruit__fp">${t('无限火力')}</span>` : null}
+              ${r.dlcIds?.length ? html`<span class="hub-recruit__dlc">${t('DLC 房间')} · ${r.dlcIds.length}</span>` : null}
               ${r.nodeName ? html`<span class="t-dim">${r.nodeName}</span>` : null}
             </span>
           </span>
@@ -1022,6 +1023,7 @@ function MatchmakingModal({ open, onClose, onJoin, onSpectate }) {
                       <span>${DIFFICULTY_NAMES[r.difficulty] || r.difficulty}</span>
                     </span>
                     ${r.random ? html`<span class="mm-room-rm">${t('无限火力 · 1.1 ·')} ${r.variant === 'endurance' ? t('持久鏖战') : r.variant === 'marathon' ? t('最长时赛') : t('快速突袭')}</span>` : null}
+                    ${r.dlcIds?.length ? html`<span class="mm-room-dlc" title=${r.dlcIds.join(', ')}>${t('DLC 房间')} · ${r.dlcIds.length}</span>` : null}
                     <span class="mm-room-players">
                       <${Icon} name="users" />
                       <span class="num">${r.humans} / ${r.maxSeats || MAX_SEATS}</span>
