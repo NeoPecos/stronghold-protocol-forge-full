@@ -30,15 +30,17 @@ import { checkScript } from '../../shared/plugins/scriptCheck.js';
 /** The helpers `sp:sdk@1` exports as `kit` (shared/plugins/sdk.js; test/plugins/forgeImport.test.js pins the list). */
 export const SDK_KIT_NAMES = Object.freeze(['num', 'talentBb', 'talentGrid', 'moduleBb', 'traitBb', 'moduleOn', 'up', 'cheb',
   'isMainHit', 'byEnemyAttack', 'skillBusy', 'giveSp', 'onHitBy', 'onHitOn', 'onDamagedOn', 'enemiesInGrid', 'alliesInGridOf',
-  'enemyInRange', 'statBuff', 'toggleBuff', 'instantKind', 'skillRec', 'skillBbOf', 'batMod']);
+  'enemyInRange', 'statBuff', 'toggleBuff', 'instantKind', 'skillRec', 'skillBbOf', 'batMod', 'makeZone', 'holdProtect',
+  'protectMods', 'PROTECT_TICK_HOLD']);
 
 /** Forge's SDK specifiers this importer rewrites to `sp:sdk@1`: the SDK member, and the names it has. */
 export const FORGE_IMPORT_MAP = Object.freeze({
   '@kit/tier1.js': Object.freeze({ member: 'kit', names: SDK_KIT_NAMES }),
+  '@kit/tier4.js': Object.freeze({ member: 'kit', names: Object.freeze(['AURA', 'whileDeployed', 'reveal', 'enemiesOnRange']) }),
   '@sim/constants.js': Object.freeze({ member: 'constants', names: Object.freeze(Object.keys(SIM_CONSTANTS)) }),
   '@sim/detmath.js': Object.freeze({ member: 'math', names: Object.freeze(Object.keys(DETMATH)) }),
   '@sim/dir.js': Object.freeze({ member: 'dir', names: Object.freeze(['dirVec', 'offsetTile']) }),
-  '@sim/targeting.js': Object.freeze({ member: 'targeting', names: Object.freeze(['absoluteRangeKeys']) }),
+  '@sim/targeting.js': Object.freeze({ member: 'targeting', names: Object.freeze(['absoluteRangeKeys', 'canTargetEnemy', 'sortEnemyTargets']) }),
 });
 
 /** The sandbox's per-plugin source cap (shared/plugins/sandbox.js SANDBOX_LIMITS.bytes; the test pins it). */
@@ -132,7 +134,6 @@ function readModule(path, bytes, parse) {
       return null;
     }
     const map = FORGE_IMPORT_MAP[d.spec];
-    if (d.spec === '@sim/targeting.js' && name === 'sortEnemyTargets') return fail('sortEnemyTargets 会改写候选数组并读取活的战场对象，没有安全的纯函数映射。', 'sortEnemyTargets mutates the candidate array and reads live battle objects; no safe pure mapping is exposed.');
     if (!map.names.includes(name)) return fail(`第 ${line} 行从 ${d.spec} 取的「${shown(name)}」不在 sp:sdk@1 的 ${map.member} 里。`, `"${shown(name)}" on line ${line} is not in the ${map.member} of sp:sdk@1 (from ${d.spec}).`);
     return null;
   };

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理面板 · 西安实验服</title>
+<style>
+  :root { color-scheme: dark; --bg: #0b0f12; --card: #12181d; --line: #22303a; --text: #cfe3dc; --muted: #7d939c; --accent: #35e0b0; --warn: #ffb454; --bad: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); background: #0e1418; position: sticky; top: 0; z-index: 2; }
+  h1 { font-size: 17px; margin: 0; letter-spacing: .04em; }
+  h1 .tag { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .auth { display: flex; gap: 8px; align-items: center; }
+  input { background: #0b1116; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; min-width: 300px; font: inherit; }
+  button { background: #16211f; color: var(--accent); border: 1px solid #2b4a43; border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover { background: #1d2c29; }
+  button.danger { color: var(--bad); border-color: #5a2b2b; background: #1d1414; }
+  button.mini { padding: 3px 9px; font-size: 12px; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; padding: 16px 20px 40px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .card.wide { grid-column: 1 / -1; }
+  .card h2 { font-size: 14px; margin: 0 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; letter-spacing: .03em; }
+  .muted { color: var(--muted); font-size: 12.5px; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px 14px; }
+  .kv div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed #1c262c; padding: 3px 0; }
+  .kv span:first-child { color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #1b252b; vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td.actions { white-space: nowrap; }
+  td.actions button { margin-right: 4px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; }
+  .ok { color: var(--accent); }
+  .bad { color: var(--bad); }
+  .warn { color: var(--warn); }
+  .empty { color: var(--muted); padding: 8px 0; }
+  #who { display: inline-flex; align-items: center; min-width: 120px; }
+  select { background: #0b1116; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>管理面板 <span class="tag">西安实验服 · v0.3.1</span></h1>
+  <div class="auth">
+    <input id="token" type="password" placeholder="管理员令牌（x-sp-admin-token）" autocomplete="off">
+    <button id="login">登录</button>
+    <span id="who" class="muted"></span>
+  </div>
+</header>
+<main>
+  <section class="card">
+    <h2>服务器状态 <button class="mini" data-refresh="status">刷新</button></h2>
+    <div id="status" class="kv"><div class="muted">未登录</div></div>
+  </section>
+  <section class="card">
+    <h2>服务器负载 <button class="mini" data-refresh="servers">刷新</button></h2>
+    <div id="servers"></div>
+  </section>
+  <section class="card wide">
+    <h2>房间与对局管理 <button class="mini" data-refresh="status">刷新</button></h2>
+    <div id="rooms" class="empty">未登录</div>
+  </section>
+  <section class="card">
+    <h2>维护开关</h2>
+    <p class="muted">开启后拒绝新的 WebSocket 连接；已在场的玩家不受影响。</p>
+    <p><button id="maintenance">读取状态</button> <span id="maintenance-state" class="muted">—</span></p>
+  </section>
+  <section class="card">
+    <h2>未迁移模块</h2>
+    <p class="muted">公告、聊天监控、账号管理：v0.3.1 上游没有对应设施，接口返回空数据。房间/对局管理、服务器状态与负载、维护开关可用。</p>
+  </section>
+</main>
+<script src="/js/admin-panel.js" defer></script>
+</body>
+</html>

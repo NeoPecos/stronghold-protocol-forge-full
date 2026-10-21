@@ -6,6 +6,7 @@ import { html, Icon, TierChip, Tooltip } from './components.js';
 import { data, useData, localAsset } from '../data.js';
 import { useStore } from '../store.js';
 import { parseRichText, rtClassName } from './richText.js';
+import { avatarUrl } from './avatarCatalog.js';
 import { t as tr } from '../../../shared/i18n.js';
 import {
   uiUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl, bondIconUrl, bandIconUrl,

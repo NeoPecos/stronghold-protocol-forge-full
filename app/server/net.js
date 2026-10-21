@@ -128,6 +128,10 @@ export class Session {
     this.connected = false;
     /** @type {number | null} local first-welcome stamp of the attached client (optional, not authentication) */
     this.claimAt = null;
+    /** @type {string | null} 账号库里的 playerId（0.3.1 账号体系，见 server/http/accountsApi.js）；null = 未绑定账号的会话 */
+    this.accountPlayerId = null;
+    /** @type {string | null} 账号角色（'admin' 时管理面板可见） */
+    this.accountRole = null;
     /** @type {number} ms epoch of the last inbound frame / pong */
     this.lastSeen = now;
     /** @type {number | null} ms epoch when the socket was lost (null while connected) */
@@ -190,6 +194,7 @@ export class SessionRegistry {
    * Create a new session with a fresh playerId and token. Evicts the oldest idle (disconnected, roomless)
    * session when the registry is full. Returns null when full of active sessions.
    * @param {string} name
+   * @param {string | null} [accountPlayerId] 账号绑定的公共 id（账号体系；缺省时随机生成）
    * @returns {Session | null}
    */
   create(name, stablePlayerId = null) {
@@ -567,10 +572,14 @@ export class Network {
    *   log?: { info: Function, warn: Function, error: Function, debug?: Function },
    *   now?: () => number,
    *   options?: Partial<typeof NET_DEFAULTS>,
+   *   accounts?: { enabled: boolean, verifyTicket: (t: unknown) => { playerId: string, name: string, role: string|null } | null } | null,
    * }} opts
    */
-  constructor({ registry, handler, accounts = null, log = noopLog, now = Date.now, options = {} }) {
+  constructor({ registry, handler, accounts = null, friends = null, log = noopLog, now = Date.now, options = {} }) {
     this.registry = registry;
+    /** @type {ReturnType<typeof import('./http/accountsApi.js')['createAccountsApi']> | null} */
+    /** @type {ReturnType<typeof import('./friends.js')['createFriendsService']> | null} 好友系统（移植自 0.3.0） */
+    this.friends = friends;
     this.handler = handler;
     // 账号（`SP_ACCOUNTS=1`）：**只有**非 null 时 `hello` 才会多出认证那一段。没有它就是今天那条路径
     // （不读账号库、不要求凭证、不发 `AUTH_REQUIRED`）—— 这是「文件存在不许悄悄改握手语义」的执行点。
@@ -710,6 +719,19 @@ export class Network {
     if (!conn.session) { this.reply(conn, errorMsg(ERR.BAD_MSG, rid, 'hello required')); return; }
     if (HEAVY_TYPES.has(msg.t) && !conn.heavy.take(now)) { this.reply(conn, errorMsg(ERR.RATE, rid, `${msg.t} too often`)); return; }
 
+    // 好友系统（移植自 0.3.0）：friend.* 交给 server/friends.js，回复沿用同一 rid/answer 通道
+    if (this.friends && msg.t.startsWith('friend.')) {
+      let fres;
+      try {
+        fres = this.friends.handle(conn.session, msg);
+      } catch (e) {
+        this.log.error(`[net] friends crashed on ${msg.t}`, e);
+        fres = { error: ERR.INTERNAL };
+      }
+      this.answer(conn, msg, rid, fres);
+      return;
+    }
+
     let res;
     try {
       // client-side combat reports (b.progress / b.result, DESIGN §14) belong to the running match like 'g.*' intents:
@@ -745,7 +767,11 @@ export class Network {
       // surface as an error toast in the browser)
       if (msg.t === 'b.progress' && !validRid(rid)) return;
       this.reply(conn, errorMsg(isErrCode(res.error) ? res.error : ERR.INTERNAL, rid, res.detail));
-    } else if (validRid(rid)) this.reply(conn, { t: 'ok', rid });
+    } else if (validRid(rid)) {
+      const payload = msg.t === 'lobby.presence' && Number.isInteger(res?.online) ? { online: res.online, rooms: res.rooms }
+        : msg.t === 'lobby.chatHistory' && Array.isArray(res?.messages) ? { messages: res.messages } : {};
+      this.reply(conn, { t: 'ok', rid, ...payload });
+    }
   }
 
   /**
@@ -759,7 +785,7 @@ export class Network {
       this.reply(conn, errorMsg(ERR.BAD_MSG, rid, `version mismatch: server ${PROTOCOL_VERSION}`));
       return;
     }
-    const name = sanitizeName(msg.name);
+    let name = sanitizeName(msg.name);
     if (!name) { this.reply(conn, errorMsg(ERR.BAD_MSG, rid, 'bad field name')); return; }
 
     // ---- 账号（`SP_ACCOUNTS=1`）------------------------------------------------------------------
@@ -772,6 +798,12 @@ export class Network {
       // 但要核对三件事 —— 账号还在、playerId 没变、账号名与这次 hello 的名字一致，否则就是「顶着别人的会话
       // 改名」。任一条不成立都按凭证错误拒，不给「你猜对了哪一半」的信息。
       const tokenSession = msg.token ? this.registry.byToken(msg.token) : null;
+      // a5 移植（accounts-port/NOTES2.md）：`hello.auth` 不是 'login'/'register' 时按 30 天票据验签
+      // （/api/account/login 签发；密钥来自 server/index.js 传给 createAccountsApi 的 secretFile）。
+      // verifyTicket 对任何坏输入都返回 null、从不抛；这里先看 `this.accounts.tickets` 在不在，
+      // 所以「开了 SP_ACCOUNTS 但没装 accountsApi」也只会退回 AUTH_REQUIRED，不会 TypeError。
+      const ticketAuth = (this.accounts.tickets && msg.auth !== 'login' && msg.auth !== 'register')
+        ? this.accounts.tickets.verifyTicket(msg.auth) : null;
       const active = conn.session || (tokenSession && tokenSession.name === name ? tokenSession : null);
       if (active) {
         const bound = this.accounts.get(active.name);
@@ -780,6 +812,10 @@ export class Network {
           return;
         }
         account = bound;
+      } else if (ticketAuth) {
+        // 票据即身份（a5 语义）：名字与 playerId 都取票据里的，不再派生 scrypt，也不再要求密码。
+        // 分流顺序：会话内(active) > 票据(ticketAuth) > 原生 login/register；三者互斥，不会串道。
+        account = { name: ticketAuth.name, playerId: ticketAuth.playerId, role: ticketAuth.role };
       } else {
         if (msg.auth !== 'login' && msg.auth !== 'register') {
           this.reply(conn, errorMsg(ERR.AUTH_REQUIRED, rid));
@@ -828,6 +864,11 @@ export class Network {
       session.connected = true;
       session.claimAt = Number.isFinite(msg.claimAt) ? msg.claimAt : null;
       session.disconnectedAt = null;
+      if (account) { session.accountPlayerId = account.playerId; session.accountRole = account.role || null; }
+    }
+    if (account && session.accountPlayerId && session.accountPlayerId !== account.playerId) {
+      this.reply(conn, errorMsg(ERR.AUTH_REQUIRED, rid, 'account mismatch'));
+      return;
     }
     // 昵称永远取**账号名**（如果这次是带账号的）：否则一个已认证会话可以发第二条 hello 把显示名改成任何东西。
     session.name = account ? account.name : name;

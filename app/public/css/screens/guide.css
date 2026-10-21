@@ -52,7 +52,7 @@
 .guide__stage { position: relative; }
 .guide__page {
   position: relative; overflow: hidden;
-  width: min(calc(96vw - .5rem), calc((100vh - 2.3rem) * 16 / 9));
+  width: min(calc(96vw - .5rem), calc((100dvh - 2.3rem) * 16 / 9));
   aspect-ratio: 16 / 9;
   background: #050807 repeating-linear-gradient(135deg, rgba(78, 216, 175, .04) 0 .02rem, transparent .02rem .14rem);
   border: 1px solid var(--line);
@@ -92,7 +92,7 @@
 .guide__count { justify-self: end; font-size: calc(.24 * var(--t)); color: var(--text-md); letter-spacing: .06em; }
 
 /* text fallback: the official tips when no tutorial page can be shown (none listed, or none of a page's copies loads) */
-.guide__stage--text { width: min(92vw, 10rem); max-height: calc(100vh - 2rem); overflow: auto; padding: .1rem .06rem; }
+.guide__stage--text { width: min(92vw, 10rem); max-height: calc(100dvh - 2rem); overflow: auto; padding: .1rem .06rem; }
 .guide__tips ol { margin: .14rem 0 0; padding-left: .34rem; display: flex; flex-direction: column; gap: .08rem; }
 .guide__tips li { font-size: calc(.18 * var(--t)); line-height: 1.6; color: var(--text-md); }
 .guide__tips li::marker { color: var(--mint-500); font-family: var(--font-num); }
@@ -104,5 +104,5 @@
   .guide__box { padding: .08rem .12rem; gap: .06rem; }
   .guide__head { min-height: .5rem; }
   .guide__titles { display: none; }
-  .guide__page { width: min(calc(96vw - .3rem), calc((100vh - 1.5rem) * 16 / 9)); }
+  .guide__page { width: min(calc(96vw - .3rem), calc((100dvh - 1.5rem) * 16 / 9)); }
 }

@@ -119,13 +119,18 @@ export class PlayerRound {
     if (this.m.players && this.m.players.get(this.playerId) !== this) return;
     const activated = [];
     const deactivated = [];
+    const changed = [];
     for (const id of this.gd.bondIds) {
       const was = !!(before && before[id] && before[id].active);
       const is = !!(after && after[id] && after[id].active);
+      const previousTier = before?.[id]?.tier ?? 0;
+      const currentTier = after?.[id]?.tier ?? 0;
+      if (previousTier !== currentTier) changed.push({ bondId: id, before: previousTier, after: currentTier });
       if (is && !was) activated.push(id);
       else if (was && !is) deactivated.push(id);
     }
     if (activated.length || deactivated.length) this.m.dispatch(this, 'onActiveBonds', { activated, deactivated });
+    if (changed.length) this.m.dispatch(this, 'onBondTiers', { changed });
   }
 
   activatedLayers() { return activatedLayers(this.bonds); }

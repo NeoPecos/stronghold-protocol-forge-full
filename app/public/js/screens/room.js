@@ -62,6 +62,7 @@ import { chessAvatarUrl } from '../ui/assetUrls.js';
 import { CARD_PREF, cardOperators, seatPortrait } from '../ui/seatArt.js';
 // 别人那一席的**玩家头像**（`appearance.avatar` 那一路，见 `ui/portraitChain.js`）：座位卡是它的两个读点之一。
 import { peerAvatarOf } from '../ui/portraitChain.js';
+import { remembersCapacity, setCapacityRemember } from '../ui/roomPrefs.js';
 import { C2S } from '../../../shared/protocol.js';
 import { difficultyInfo, ProtoCard, LAYER_TEXT, serverSeatMaxOf } from './lobby.js';
 import { ProtocolScene } from '../ui/protocolScene.js';
@@ -136,11 +137,8 @@ export function roomFacts(room, myId) {
   return {
     seats, occupied, humans, mine, isHost, readyHumans, isReady,
     emptySeats: seats.filter((s) => !s).length,
-    canStart: isHost && othersReady && !!mine && contentReady && (!room?.content?.trusted || humans.every(s => room.content.trusted.consent[s.seat])),
+    canStart: isHost && othersReady && !!mine,
     othersReady,
-    modded,
-    contentReady,
-    myContent: modded ? (mine?.content || 'loading') : 'ready',
     // spectator seats (never players: not in `humans`, never counted for ready / start)
     spectators: Array.isArray(room?.spectators) ? room.spectators.filter((s) => s && typeof s === 'object') : [],
     spectating: isSpectating(room, myId),
@@ -256,11 +254,16 @@ export function seatCapRoomRange(room, serverMax) {
 function SeatCapSetter({ room, isHost, onPick }) {
   const range = isHost ? seatCapRoomRange(room, serverSeatMaxOf()) : null;
   const [asked, setAsked] = useState(null);
+  const [remember, setRemember] = useState(remembersCapacity);
   useEffect(() => {
     if (asked != null && room && room.seatCap === asked) setAsked(null);
   }, [asked, room]);
+  useEffect(() => {
+    if (isHost && remember && room) setCapacityRemember(true, room.maxSeats || room.seatCap || DEFAULT_SEATS);
+  }, [isHost, remember, room?.maxSeats, room?.seatCap]);
   if (!range) return null;
   const shown = asked != null && asked >= range.min && asked <= range.max ? asked : range.value;
+  const choices = null;
   const pct = Math.round(((shown - range.min) / (range.max - range.min)) * 100);
   const commit = async (v) => {
     const want = Math.min(Math.max(v, range.min), range.max);
@@ -271,12 +274,16 @@ function SeatCapSetter({ room, isHost, onPick }) {
   return html`<div class="seat-cap seat-cap--room">
     <${MicroLabel} tone="mint">SEATS<//>
     <span class="seat-cap__name">${t('本房间人数上限')}</span>
-    <input class="seat-cap__slider" type="range" min=${range.min} max=${range.max} step="1" value=${shown}
+    ${choices ? html`<div class="seat-cap__choices" role="radiogroup" aria-label=${t('本房间人数上限')}>
+      ${choices.map((n) => html`<button type="button" class=${`seat-cap__choice${n === shown ? ' is-on' : ''}`}
+        role="radio" aria-checked=${n === shown} disabled=${!!asked} onClick=${() => commit(n)}>${n}</button>`)}</div>
+      <label class="seat-cap__remember"><input type="checkbox" checked=${remember}
+        onChange=${(e) => { const on = e.currentTarget.checked; setRemember(on); setCapacityRemember(on, shown); }} />${t('记住本次选择')}</label>` : html`<input class="seat-cap__slider" type="range" min=${range.min} max=${range.max} step="1" value=${shown}
       style=${`--pct:${pct}%`} aria-label=${t('本房间人数上限')}
       aria-valuemin=${range.min} aria-valuemax=${range.max} aria-valuenow=${shown}
       title=${t('不能小于同盟内现有人数（含 AI 队友）')}
       onInput=${(e) => setAsked(Number(e.currentTarget.value))}
-      onChange=${(e) => commit(Number(e.currentTarget.value))} />
+      onChange=${(e) => commit(Number(e.currentTarget.value))} />`}
     <span class="seat-cap__value num">${shown}<span class="t-dim"> / ${range.max}</span></span>
   </div>`;
 }
@@ -309,7 +316,6 @@ function SeatCard({ seat, index, room, facts, myId, busy, onKick, onInvite, sear
       <div class="rseat__plate rseat__plate--empty" aria-hidden="true"></div>
     </article>`;
   }
-  const consent = room.content?.trusted?.consent?.[seat.seat];
   const isMe = seat.playerId === myId;
   const isHostSeat = seat.playerId === room.hostId;
   const offline = seat.connected === false && !seat.isBot;
@@ -321,7 +327,6 @@ function SeatCard({ seat, index, room, facts, myId, busy, onKick, onInvite, sear
   return html`<article class=${`rseat${ready ? ' is-ready' : ''}${flash ? ' is-flash' : ''}${isMe ? ' is-me' : ''}${isHostSeat ? ' is-host' : ''}${offline ? ' is-offline' : ''}${seat.isBot ? ' is-bot' : ''}`}
       data-team=${team} style=${`--i:${index}${team ? `;--team-color:${teamColor(team)}` : ''}`}>
     <span class="rseat__clip" aria-hidden="true"></span>
-    ${consent ? html`<span data-testid="script-consented">${t('已同意')}</span>` : null}
     <header class="rseat__strip"><i></i><span class="num">P${index + 1}</span>${room.mode === 'recon' ? html`<span class="rseat__team">${t('{n} 队', { n: Number.isInteger(seat.team) ? seat.team : 1 })}</span>` : null}</header>
     <div class=${`rseat__art${canPick ? ' is-pickable' : ''}`} onClick=${canPick ? onPickCard : undefined} title=${canPick ? t('点击更换名片干员') : undefined}>
       ${src && bad !== src ? html`<img src=${src} alt="" draggable=${false} loading="lazy" onError=${() => setBad(src)} />`
@@ -452,7 +457,8 @@ function RoomProtocol({ room, variant, onClose, onPick, busy, leaving = false })
 }
 
 /** ⚙ of the bottom pill: 私密房间, 人数上限 (with the 10-seat constants), AI 队友最后选择, 无限火力 branch. */
-function RoomOptions({ room, facts, myId, busy, online, variant, onPrivate, onSeatCap, onAiLast, onVariant, onClose, leaving = false }) {
+function RoomOptions({ room, facts, myId, busy, online, variant, onPrivate, onSeatCap, onAiLast, onVariant,
+  onAllowSpectators, onRecruitWanted, onInviteOnly, onAiBand, bands = [], onClose, leaving = false }) {
   const coop = room.mode !== 'solo';
   const host = facts.isHost;
   useEffect(() => {
@@ -466,6 +472,26 @@ function RoomOptions({ room, facts, myId, busy, online, variant, onPrivate, onSe
     ${coop && CAN_PRIVATE ? html`<label class="rs-opt"><input type="checkbox" checked=${room.private === true} disabled=${!host || !!busy || !online} onChange=${(e) => onPrivate(e.currentTarget.checked)} />
       <span>${t('私密房间')}<small>${room.private ? t('仅凭同盟密钥或邀请加入，不能搜寻队友') : t('公开大厅可见，可以搜寻队友')}</small></span></label>` : null}
     <${SeatCapSetter} room=${room} isHost=${host} onPick=${onSeatCap} />
+    ${room.mode === 'coop' ? html`
+      <label class="rs-opt"><input type="checkbox" checked=${room.allowSpectators !== false} disabled=${!host || !!busy || !online}
+        onChange=${(e) => onAllowSpectators(e.currentTarget.checked)} />
+        <span>${t('允许观战')}<small>${room.allowSpectators !== false ? t('其他人可以观战席观看（最多 {MAX_SPECTATORS} 名）', { MAX_SPECTATORS }) : t('关闭后新的观战者不能进入')}</small></span></label>
+      <label class="rs-opt"><input type="checkbox" checked=${room.recruitWanted !== false} disabled=${!host || !!busy || !online}
+        onChange=${(e) => onRecruitWanted(e.currentTarget.checked)} />
+        <span>${t('期望路人加入')}<small>${room.recruitWanted !== false ? t('公开招募：匹配与模拟邀约优先挑选') : t('不主动招募路人')}</small></span></label>
+      <label class="rs-opt"><input type="checkbox" checked=${room.inviteOnly === true} disabled=${!host || !!busy || !online}
+        onChange=${(e) => onInviteOnly(e.currentTarget.checked)} />
+        <span>${t('仅邀请')}<small>${room.inviteOnly ? t('不出现在模拟邀约，只能凭密钥加入') : t('公开大厅可见，可以凭密钥加入')}</small></span></label>
+      <${UniteOptions} room=${room} host=${host} busy=${busy} online=${online} />
+      ${host ? html`<div class="rs-opt rs-opt--aiband"><span>${t('AI 策略指定')}</span>
+        ${(facts.seats || []).filter((s) => s && s.isBot).map((s) => html`<label class="rs-aiband" key=${`ab${s.seat}`}>
+          <span>P${s.seat + 1} ${s.name || t('AI')}</span>
+          <select value=${room.aiBands?.[s.seat] || ''} disabled=${!!busy || !online}
+            onChange=${(e) => onAiBand(s.seat, e.currentTarget.value)}>
+            <option value="">${t('自动（AI 自己选）')}</option>
+            ${bands.map((b) => html`<option value=${b.bandId} key=${b.bandId}>${b.name || b.bandId}</option>`)}</select>
+        </label>`)}</div>` : null}
+    ` : null}
     <${AiLastToggle} option=${aiLastOption(room, myId)} busy=${busy} onToggle=${onAiLast} />
     ${room.random === true ? html`<div class="rs-opt rs-opt--variant"><span>${t('模式分支')}</span>
       <div class="dpick" role="radiogroup" aria-label=${t('模式分支')}>
@@ -548,7 +574,8 @@ function RoomModsPanel({ room, myId = null, onAlignment = null, hidden = false }
   const mods = roomModsOf(room);
   // 服务端声明过哪些包（`welcome.mods.packs`，main.js 写进 store.roomMods）：房主在房间里能挑的就是这一份的子集。
   const available = roomMods.availableMods();
-  const editable = available.length > 0 && canEditRoomMods(room, myId);
+  // 本服务器内容固定：房间不提供改集合入口（服务端同样拒绝 room.mods）。
+  const editable = false;
   const [editing, setEditing] = useState(false);
   const [picked, setPicked] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -837,6 +864,21 @@ export function RoomScreen() {
   // 本房座位上限 (业主裁决 B5): the `code` goes along so the request can only ever address THIS room — a tab acting on a
   // stale frame gets NOT_IN_ROOM instead of resizing whatever room it happens to be in now.
   const setSeatCap = (seatCap) => run('seatcap', () => net.request('room.setSeatCap', { code: room.code, seatCap }));
+  const setAllowSpectators = (on) => run('spec', () => net.request('room.setAllowSpectators', { on }));
+  const setRecruitWanted = (on) => run('recruit', () => net.request('room.setRecruitWanted', { on }));
+  const setInviteOnly = (on) => run('invite', () => net.request('room.setInviteOnly', { on }));
+  const setAiBand = (seat, bandId) => run(`aiband${seat}`, () => net.request('room.setAiBand', { seat, bandId }));
+  const [bandList, setBandList] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    fetch('/data/bands.json', { credentials: 'same-origin' }).then((r) => r.json()).then((j) => {
+      if (!alive || !j || typeof j !== 'object') return;
+      setBandList(Object.values(j).filter((b) => b && b.bandId)
+        .sort((a, b) => (a.sortId || 0) - (b.sortId || 0))
+        .map((b) => ({ bandId: b.bandId, name: b.name || b.bandId })));
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   // 「添加 AI 队友」：包版房间把空席位的入口只留了「邀请」，而服务端 `room.addBot` / `room.removeBot` 一直都在
   // （HEAD 的引擎房间有这两个按钮，见本次 CHANGELOG 0.18.4）。按业主裁定补回**入口**，协议与服务端一字未动。
   const addBot = () => run('add', () => net.request('room.addBot', {}));
@@ -895,8 +937,6 @@ export function RoomScreen() {
       ? html`<span class="t-lo"><${Icon} name="eye" />${t('观战中 · 不占博士席位，模拟开始后可切换观看各位博士')}</span>`
     : !coop
       ? html`<span class="t-mint">${t('*模拟协议已就绪，准许进入模拟')}</span>`
-    : facts.modded && !facts.contentReady
-      ? html`<span class="t-lo">${t('等待所有博士载入房间的插件内容')}</span>`
     : facts.isHost
       ? facts.canStart
         ? facts.emptySeats && searchable
@@ -982,7 +1022,9 @@ export function RoomScreen() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill-rule="evenodd" /></svg>
           </button>
           ${optsShown ? html`<${RoomOptions} room=${room} facts=${facts} myId=${me.playerId} busy=${busy} online=${online} variant=${variant}
-            onPrivate=${setPrivate} onSeatCap=${setSeatCap} onAiLast=${setAiLast} onVariant=${setVariant} onClose=${() => setOpts(false)} leaving=${optsLeaving} />` : null}
+            onPrivate=${setPrivate} onSeatCap=${setSeatCap} onAiLast=${setAiLast} onVariant=${setVariant}
+            onAllowSpectators=${setAllowSpectators} onRecruitWanted=${setRecruitWanted} onInviteOnly=${setInviteOnly}
+            onAiBand=${setAiBand} bands=${bandList} onClose=${() => setOpts(false)} leaving=${optsLeaving} />` : null}
         </div>
       </div>
       <div class="rs-foot__right">
@@ -1016,45 +1058,26 @@ export function RoomScreen() {
   </div>`;
 }
 
-/** Persistent across room/game routes, including spectators who never consent. */
-export function TrustedNotice() {
-  const state = useStore(s => s);
-  const room = state.room, cs = room?.content?.cs, trusted = room?.content?.trusted;
-  const seat = room?.seats?.find(s => s && s.playerId === state.me?.playerId);
-  const [dismissed,setDismissed] = useState(null);
-  const [busy,setBusy] = useState(false);
-  const [review,setReview] = useState(false);
-  const choose = async accept => {
-    setBusy(true);
-    try {
-      if (seat) await net.request('room.consent',{cs,accept});
-      rememberScriptConsent(cs,accept);
-      setDismissed(cs); setReview(false);
-      if (accept && trusted.plugins.some(p => p.permissions.includes('trusted.page'))) {
-        const url = new URL(location.href); url.searchParams.set('cs',cs); url.searchParams.set('room',room.code);
-        location.assign(url.href); return;
-      }
-      store.set({room:{...store.get().room}}); // wake the content loader after local persistence
-    } catch (e) { toastError(e); }
-    finally { setBusy(false); }
-  };
-  useEffect(() => {
-    if (trusted && seat && hasScriptConsent(cs) && !trusted.consent?.[seat.seat] && !room.inMatch) {
-      net.request('room.consent',{cs,accept:true}).catch(toastError);
-    }
-  },[cs,seat?.seat,!!trusted?.consent?.[seat?.seat]]);
-  if (!trusted) return null;
-  return html`<aside class="trusted-banner" data-testid="trusted-banner">
-    <strong>${t('受信任插件')}</strong>
-    <button onClick=${() => setReview(true)}>${t('查看风险与同意状态')}</button>
-    <${Modal} open=${review || (dismissed !== cs && !hasScriptConsent(cs))} title=${t('受信任插件')} tone="red" closeOnBackdrop=${false}
-      onClose=${() => room.inMatch ? setReview(false) : choose(false)} actions=${html`<${Button} disabled=${busy} onClick=${() => choose(false)} data-testid="script-decline">${t('拒绝')}<//>
-        <${Button} disabled=${busy} onClick=${() => choose(true)} data-testid="script-accept">${t('同意运行')}<//>`}>
-      <p>${t('它可以完全控制你的游戏页面')}</p>
-      <p>${t('仅在你信任所有作者及以下代码时同意。换了内容组合需要重新同意。')}</p>
-      <ul>${trusted.plugins.map(p => html`<li key=${p.id}><strong>${p.id} ${p.version}</strong>
-        <p>${t('作者：{authors}',{authors:(p.authors || []).join(', ') || '—'})}</p>
-        <p class="trusted-hash">SHA-256: ${p.hash}</p><p>${t('权限：{permissions}',{permissions:p.permissions.join(', ')})}</p></li>`)}</ul>
-    <//>
-  </aside>`;
+// compat shim for 0.3.1 shell (UI package bases on 0.2.x): main.js still imports TrustedNotice
+export function TrustedNotice() { return null; }
+
+/** phase B：扩展联防 / 联防护卫轮换 / 真人先手 / 协防人数（0.3.0 房间规则）。 */
+function UniteOptions({ room, host, busy, online }) {
+  const limit = Math.min(10, Math.max(2, Math.floor(Math.max(1, room.maxSeats || 4) / 4) * 2));
+  const dis = !host || !!busy || !online;
+  const set = (name, payload) => { net.request(name, payload).catch(() => {}); };
+  return html`<label class="rs-opt"><input type="checkbox" checked=${room.extendedUnite === true} disabled=${dis}
+      onChange=${(e) => set('room.setExtendedUnite', { on: e.currentTarget.checked })} />
+      <span>${t('扩展联防')}<small>${room.extendedUnite ? t('5 轮最多 10 名协防，每少一对协防 +10 秒') : t('关闭：每轮固定 2 名协防')}</small></span></label>
+    ${room.extendedUnite ? html`<label class="rs-opt"><input type="checkbox" checked=${room.uniteRotation !== false} disabled=${dis}
+      onChange=${(e) => set('room.setUniteRotation', { on: e.currentTarget.checked })} />
+      <span>${t('联防护卫轮换')}<small>${t('近 3 轮未协防的博士优先')}</small></span></label>
+    <label class="rs-opt"><input type="checkbox" checked=${room.uniteHumanFirst !== false} disabled=${dis}
+      onChange=${(e) => set('room.setUniteHumanFirst', { on: e.currentTarget.checked })} />
+      <span>${t('真人先手')}<small>${t('真人席位排在 AI 席位之前')}</small></span></label>` : null}
+    <label class="rs-opt rs-opt--cap"><span>${t('协防人数')}<small>${t('每轮最多 {n} 名（偶数）', { n: limit })}</small></span>
+      <select value=${String(room.uniteHelpers || 2)} disabled=${dis || !room.extendedUnite}
+        onChange=${(e) => set('room.setUniteHelpers', { n: Number(e.currentTarget.value) })}>
+        ${Array.from({ length: limit / 2 }, (_, k) => (k + 1) * 2).map((n) => html`<option key=${n} value=${String(n)} selected=${n === (room.uniteHelpers || 2)}>${t('{n} 人', { n })}</option>`)}
+      </select></label>`;
 }

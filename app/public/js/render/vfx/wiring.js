@@ -314,6 +314,20 @@ export class FxWiring {
 
   skinOf(u) { return u && u.skin && this.idx ? this.idx.skins[u.skin] || null : null; }
 
+  skinFxOf(view) {
+    const skinId = view?.info?.skin;
+    return skinId && this.idx?.skinFx ? this.idx.skinFx[skinId] || null : null;
+  }
+
+  skinOfView(view) {
+    const skinFx = this.skinFxOf(view);
+    return skinFx?.points ? skinFx : this.skinOf(this.unitOf(view));
+  }
+
+  skinKey(view, key) {
+    return this.skinFxOf(view)?.replace?.[key] || key;
+  }
+
   /**
    * 一枚特效该播哪一个 key（**唯一的一处分辨率**）：
    *
@@ -574,6 +588,11 @@ export class FxWiring {
     // 挂载点取自**这套时装自己的记录**（它自己的 `points`）—— 与上面那个 key 用的是同一份选择
     const skin = this.skinFor(v, u);
     let def = this.ofx.lib.def(k);
+    const replacement = lc(this.skinKey(o.skinFrom || v, k));
+    if (replacement && replacement !== k && this.ofx.lib.has(replacement)) {
+      k = replacement;
+      def = this.ofx.lib.def(k);
+    }
     if (def && def.switchable) {
       const alt = lc(this._variant(def.switchable, v, this.pose(v)));
       if (alt === 'common_empty') return null;
@@ -1319,10 +1338,10 @@ export class FxWiring {
     const go = () => {
       const now = this.ofx.time;
       if (tgt && !tgt.destroyed) {
-        for (const k of proj.onHit || []) this.playOn(k, tgt, {});
+        for (const k of proj.onHit || []) this.playOn(k, tgt, { skinFrom: src || undefined });
         if (rows) {
           const own = new Set((proj.onHit || []).map(lc));
-          for (const h of rows) if (!own.has(lc(h.k))) this.playOn(h.k, tgt, { flipFrom: src || undefined, toward: h.along && src ? beyond(src, tgt) : undefined });
+          for (const h of rows) if (!own.has(lc(h.k))) this.playOn(h.k, tgt, { flipFrom: src || undefined, skinFrom: src || undefined, toward: h.along && src ? beyond(src, tgt) : undefined });
         }
         const id = tgt.id ?? tgt.info?.id;
         this.arrived.set(id, now);

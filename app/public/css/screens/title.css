@@ -415,3 +415,10 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .notice-card__meta { margin: 0; font-size: calc(.13 * var(--t)); color: var(--text-dim); overflow-wrap: anywhere; }
 .notice-card__title { margin: .02rem 0; font-size: calc(.16 * var(--t)); color: var(--text-hi); overflow-wrap: anywhere; }
 .notice-card__body { margin: 0; font-size: calc(.15 * var(--t)); color: var(--text-md); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+
+/* a5 移植：标题页账号行（与 a5 public/css/screens/title.css 同一组规则；未开账号的服务器不渲染这些节点） */
+.title-account-row { display: flex; align-items: center; justify-content: center; gap: .14rem; margin-top: .02rem; flex-wrap: wrap; }
+.title-account-switch { background: none; border: 0; padding: .02rem 0; font: inherit; font-size: .22rem; color: #b9c8cf; cursor: pointer; }
+.title-account-switch:hover { color: #7fe9c3; }
+.title-account-switch:disabled { opacity: .5; cursor: default; }
+.title-account-error { font-size: .13rem; color: #ff8d7a; }

@@ -70,14 +70,17 @@ import { createStudio } from './studio/index.js';
 import { siteCsp } from './http/csp.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, pickEncoding, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
-import { createRequestHandler } from './http/routes.js';
+import { createRequestHandler, healthReport } from './http/routes.js';
 import { LARGE_ASSETS_REDOWNLOAD_PATH, LARGE_ASSETS_LIST_PATH, LARGE_ASSETS_STATUS_PATH, isEnabled, largeAssetsStatus, readResourceList, startRedownload } from './largeAssets.js';
 // 「大型资源」的备用源：同源代理（跨域那一跳由服务端走；页面的 CSP `connect-src 'self'` 一个字不动）。
 import { createAssetPackProxy } from './assetPack.js';
 import { createTrafficCounter } from './http/traffic.js';
+import { createAdminApi, maintenanceOn } from './http/adminApi.js';
+import { createAccountsApi } from './http/accountsApi.js';
+import { createFriendStore } from './friends.js';
+import { AccountStore } from './accounts.js';
 import { createAssetIndex } from './http/assetIndex.js';
 import { createManifestViews } from './http/assetViews.js';
-import { AccountStore } from './accounts.js';
 import { MatchRecords } from './matchRecords.js';
 import { resolveAccountConfig } from './accountConfig.js';
 // 保留表只此一处真相（DESIGN §28.35）：核心挂载目录与「核心先吃」判据都来自 routeMount.js。
@@ -189,6 +192,18 @@ export async function startServer(opts = {}) {
   // 行为」）。为什么这样切，写在 `accountConfig.js` 的文件头。
   const accountConfig = resolveAccountConfig(opts, stateRoot);
   const accounts = accountConfig.enabled ? new AccountStore(accountConfig.accountsFile) : null;
+  const friendsStore = accounts ? createFriendStore({ file: process.env.SP_FRIENDS_FILE || path.join(stateRoot, 'friends.json'), log }) : null;
+  // a5 移植（accounts-port/NOTES2.md）：30 天票据 API 挂在 store 上，hello 与 /api/account/* 共用一份实例。
+  // SP_ACCOUNTS 未开时两者都是 null，握手、路由与服务启动逐字节不变。secret 与 a5 同语义：
+  // 首启自动生成 0600 的 hex 文件；`SP_ACCOUNTS_SECRET` 可指向部署准备好的那一份。
+  const accountsApi = accounts
+    ? createAccountsApi({
+      store: accounts,
+      secretFile: process.env.SP_ACCOUNTS_SECRET || path.join(stateRoot, 'var', 'accounts-secret-token'),
+      log,
+    })
+    : null;
+  if (accounts) accounts.tickets = accountsApi;
   const records = accountConfig.enabled ? new MatchRecords(accountConfig.recordsFile, log) : null;
   if (accountConfig.enabled) {
     // 生效值必须被**说出来**（与 resourcePolicy / transportPolicy 同一条纪律）：运维要能从启动日志确认
@@ -423,6 +438,7 @@ export async function startServer(opts = {}) {
       ...opts,
       // 账号与战绩：`accounts: null` 时 `Network` / `Lobby` 都走各自那条「没有这个功能」的分支。
       accounts,
+      friendsStore,
       records,
       ...(matchWrappers.length ? { MatchClass } : {}),
       workshop: { kits: workshopKits.kits, tokenKits: workshopKits.tokenKits, modules: workshopKits.modules, kitOwners: workshopKits.owners, tokenKitOwners: workshopKits.tokenOwners, kitBudgets: workshopKits.budgets, mods: workshopMods, hooks: workshopHooks.hooks, panels: modDeclaration.panels, assets: workshopModAssets, fx: workshopModFx, theme: modDeclaration.theme, meta: metaModules, roomAssets, battle: battleModules, battleInstallers, battlePolicies, roomHooks: roomInstallers, transport: transport.transport, serverChannels: serverChannelMap },
@@ -446,7 +462,9 @@ export async function startServer(opts = {}) {
   buildTag();
 
   const traffic = createTrafficCounter();
-  const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health: { startedAt, network, registry, lobby, modHealth: () => modMount.healthz(), content, traffic, assetIndex, views, trusted: trustedRuntime?.health }, log,
+  const healthDeps = { startedAt, network, registry, lobby, modHealth: () => modMount.healthz(), content, traffic, assetIndex, views, trusted: trustedRuntime?.health };
+  const admin = createAdminApi({ lobby, registry, log, health: { report: () => healthReport(healthDeps, false) } });
+  const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health: healthDeps, log, admin,
     records, accounts,
     largeAssets: {
       path: LARGE_ASSETS_STATUS_PATH, status: largeAssetsStatus,
@@ -474,7 +492,7 @@ export async function startServer(opts = {}) {
     // 所以「握手之前那次 HTTP」与「握手之后那一帧」拿到的一定是同一份清单（没有包声明时它回 404）。
     modsPanels: (req, res) => serveModPanels(req, res, modDeclaration) }));
   server.on('clientError', answerClientError);
-  const wss = attachWebSocket(server, { network, log, lanes: opts.wsLanes, perMessageDeflate: transport.perMessageDeflate, traffic });
+  const wss = attachWebSocket(server, { network, log, lanes: opts.wsLanes, perMessageDeflate: transport.perMessageDeflate, traffic, maintenance: maintenanceOn });
 
   // The address actually bound. The default may fall back to IPv4; the returned host and url follow that.
   let boundHost;

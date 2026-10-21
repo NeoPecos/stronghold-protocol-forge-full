@@ -7,7 +7,7 @@
      the endings (2.75 s) — the crests close in 0–0.35 s, the words 0.25 s.
    pointer-events none: the field stays usable under them. Reduced motion: the final state, no motion. */
 .bpl {
-  --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
+  --px: min(.01rem, calc(100vw / 1920), calc(100dvh / 1080));
   --teal: #27d3ad;
   --core: #35c6dd;
   position: fixed; inset: 0; z-index: var(--z-banner); display: grid; place-items: center; pointer-events: none;

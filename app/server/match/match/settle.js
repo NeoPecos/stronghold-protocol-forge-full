@@ -28,6 +28,8 @@ export class MatchSettle {
     // player's own LP charge of this round, the same `loss` deducted below, so the box and the LP bar never disagree. A
     // leaker's own battle leaks are not its charge in a 联防 round, which is why the client cannot work the number out
     // itself. No ticker line: the official reports the outcome in the one dialog. null when no 联防 resolved.
+    // phase B：协防轮换记录（0.3.0 settle.js:27）
+    if (plan) for (const helper of plan.helpers) this.uniteAssistedRound.set(helper.playerId, this.round);
     this.uniteResultView = uniteRan && plan.leakers.length ? {
       through: plan.leakers.reduce((n, lk) => n + Math.max(0, survivors.get(lk.playerId) || 0), 0),
       helpers: plan.helpers.map((p) => p.playerId),

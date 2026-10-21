@@ -115,6 +115,9 @@ export const DEFAULT_VOICE_LANG = 'jp';
 export const VOICE_LANG_NAMES = Object.freeze({ cn: '中文', jp: '日本語', en: 'English', kr: '한국어' }); // i18n-ignore: 语言名按母语写法显示
 
 export const MAX_SEATS = 4;
+/** a5 联盟房的八档人数选择；4 人仍是默认房间大小。 */
+export const DEFAULT_SEATS = 4;
+export const ROOM_CAPACITIES = Object.freeze([4, 6, 8, 10, 12, 14, 16, 20]);
 /**
  * 这台服务器**缺省**允许多少座 (业主裁令 2026-10-12：「你改成默认 20 吧，上限可加并给出文档」)。 **它不是
  * `MAX_SEATS`**：那个 4 是「官方房间 1–4 人」的声明，也是超容变体的闸门口径（见 `server/match/Match.js` 的
@@ -231,6 +234,9 @@ export const NAME_MAX_LEN = 12;
  * declares more than this is refused as a malformed message rather than silently truncated.
  */
 export const MAX_ROOM_MODS = 64;
+
+/** 好友数量上限（移植自 0.3.0，shared/constants.js:34） */
+export const FRIEND_LIMIT = 100;
 
 export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
@@ -458,6 +464,21 @@ export const ERR = Object.freeze({
   TEST_CONFIRM: 'TEST_CONFIRM',
   TEST_DISABLED: 'TEST_DISABLED',
   TEST_FORBIDDEN: 'TEST_FORBIDDEN',
+  // 账号体系（西安实验服 0.3.1 移植主服 accounts.js，2026-10-19）：标题页登录/注册的错误码
+  AUTH_REQUIRED: 'AUTH_REQUIRED',
+  BAD_CREDENTIALS: 'BAD_CREDENTIALS',
+  NAME_TAKEN: 'NAME_TAKEN',
+  WEAK_PASSWORD: 'WEAK_PASSWORD',
+  BANNED: 'BANNED',
+  FRIEND_UNKNOWN: 'FRIEND_UNKNOWN',
+  FRIEND_SELF: 'FRIEND_SELF',
+  FRIEND_OFFLINE: 'FRIEND_OFFLINE',
+  FRIENDS_FULL: 'FRIENDS_FULL',
+  FRIENDS_PENDING: 'FRIENDS_PENDING',
+  NOT_FRIEND: 'NOT_FRIEND',
+  ALREADY: 'ALREADY',
+  FRIEND_INVITE_UNAVAILABLE: 'FRIEND_INVITE_UNAVAILABLE',
+  ROOM_INVITE_ONLY: 'ROOM_INVITE_ONLY',
   INTERNAL: 'INTERNAL',
 });
 
@@ -491,6 +512,17 @@ export const ERR_TEXT = {
   TEST_CONFIRM: N_('这是测试房间，不计入任何记录。确认加入？'),
   TEST_DISABLED: N_('测试模式未开启'),
   TEST_FORBIDDEN: N_('这不是测试房间'),
+  AUTH_REQUIRED: N_('登录已失效，请重新登录'), BAD_CREDENTIALS: N_('账号或密码错误'),
+  NAME_TAKEN: N_('该代号已被使用'), WEAK_PASSWORD: N_('密码需 8–128 位'),   BANNED: N_('该账号已被封禁'),
+  FRIEND_UNKNOWN: N_('找不到这个代号'),
+  FRIEND_SELF: N_('不能添加自己为好友'),
+  FRIEND_OFFLINE: N_('对方现在不在线'),
+  FRIENDS_FULL: N_('好友数量已达上限'),
+  FRIENDS_PENDING: N_('已经有一条待处理的申请'),
+  NOT_FRIEND: N_('你们还不是好友'),
+  ALREADY: N_('已经是好友了'),
+  FRIEND_INVITE_UNAVAILABLE: N_('这个同盟不能邀请好友'),
+  ROOM_INVITE_ONLY: N_('该同盟仅限受邀者加入'),
 };
 
 // ---- Emotes (交流, research 09 §4) -----------------------------------------------------------------------------

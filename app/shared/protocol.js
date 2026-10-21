@@ -1,7 +1,7 @@
 // Normative message catalogue (DESIGN §8). Used by server (validation) and client (building requests).
 // Every client→server message is `{ t, rid?, ...fields }`. Unknown `t` or invalid fields ⇒ ERR.BAD_MSG.
 
-import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_ROOM_MODS, EMOTES, GEO, maxSeatsFrom, MIN_SEATS, RECON } from './constants.js';
+import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_ROOM_MODS, ROOM_CAPACITIES, EMOTES, GEO, maxSeatsFrom, MIN_SEATS, RECON } from './constants.js';
 import { isDroppableChess } from './standIn.js';
 import { diySlotIds, validateDiyPicks } from './diy.js';
 import { isSupportEntries } from './support.js';
@@ -732,12 +732,13 @@ export const DEV_ACTIONS = Object.freeze([
 export const C2S = {
   // session & lobby
   hello: { name: (v) => isStr(v, NAME_MAX_LEN) && v.trim().length > 0, token: (v) => v == null || isStr(v, 64), version: (v) => v == null || isInt(v, 0, 1e6),
-    // 账号（`SP_ACCOUNTS=1`, server/accounts.js, docs/RECORDS.md）：`auth` = 'login' | 'register'，`password`
+    // 账号（`SP_ACCOUNTS=1`, server/accounts.js, docs/RECORDS.md）：`auth` = 'login' | 'register'（forge 原生）
+    // 或 a5 的 30 天票据串（server/http/accountsApi.js，上限 4096；票据就是身份，此时不需要 password），`password`
     // 只在 `auth` 给同时出现。两者都是 **$optional** —— 关掉账号的服务器上老客户端一个字段都不发，握手逐字节不变；
     // 开着账号的服务器上不发 auth 会得到 `AUTH_REQUIRED`（这是策略，不是协议不兼容）。
     // `password` 的 128 上限是**传输**上限，真正的门槛（≥8 位、无控制字符）在 `accounts.js validPassword` ——
     // 这里放宽到 128 是为了让超长口令走到那个判据去换 `WEAK_PASSWORD`，而不是被协议层当成 `BAD_MSG`。
-    auth: (v) => v === 'login' || v === 'register', password: (v) => isStr(v, 128),
+    auth: (v) => v === 'login' || v === 'register' || isStr(v, 4096), password: (v) => isStr(v, 128),
     noReplace: isBool, claimAt: (v) => isNum(v, 0, Number.MAX_SAFE_INTEGER), $optional: ['token', 'version', 'auth', 'password', 'noReplace', 'claimAt'] },
   ping: { c: (v) => typeof v === 'number' && Number.isFinite(v) },
   'room.create': {
@@ -763,6 +764,7 @@ export const C2S = {
     // `$optional` 管「键根本没出现」，判据里的 `v === undefined || v === null` 管「显式给了 null」。
     // 缺省 / `null`（= 旧客户端根本不发）⇒ 服务器缺省上限（缺省 20 座）。
     seatCap: (v) => v === undefined || v === null || isInt(v, MIN_SEATS, SEAT_CAP),
+    capacity: (v) => v === undefined || ROOM_CAPACITIES.includes(v),
     // 开发者模式（工坊包 dev-ext 的「全量模拟」，`mode:'solo'` 才收）：
     //   `dev: true` 让这一局**跳过 INFO_CHECK / BAND_DRAFT**（「确认本局信息」「选择策略」两屏）直接进战斗；
     //   `stage` 指名这一局强制打的那张图 —— 与 `SP_STAGE` 同一处覆盖逻辑（Match.rbStage），只是来源从环境变量
@@ -773,7 +775,7 @@ export const C2S = {
     teamCount: (v) => v === undefined || v === null || isInt(v, RECON.MIN_TEAMS, RECON.MAX_TEAMS),
     // test 房间（DESIGN §36.8，上游 0.3.1）：只认字面 true；普通房间不发这个键
     test: (v) => v === true,
-    $optional: ['mods', 'modIds', 'chatMode', 'seatCap', 'dev', 'stage', 'teamCount', 'test'],
+    $optional: ['mods', 'modIds', 'chatMode', 'seatCap', 'capacity', 'dev', 'stage', 'teamCount', 'test'],
   },
   // 房间同意（W7, DESIGN §28.53）：进一个**声明了模组集合**的房间（`room.state.mods`）时，真人玩家必须**明确
   // 同意**才继续 —— 这是「我知道这一局要跑别人写的内容」那句话的落点。它与 `checkModSet` 要客户端回一个摘要
@@ -801,6 +803,12 @@ export const C2S = {
   // 给**请求者本人**。开着账号时它是「我这个账号的最近一局」；关着账号时按会话 playerId 查（每次连接的新 id，
   // 所以实际上只会拿到本会话打过的局）。它在 `server/net.js` 的 `HEAVY_TYPES` 里：一次廉价请求换一整份战绩。
   'records.mine': {},
+  'friend.list': {},
+  'friend.request': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
+  'friend.accept': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
+  'friend.decline': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
+  'friend.remove': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
+  'friend.invite': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
   'room.ready': { ready: isBool },
   'room.setDifficulty': { difficulty: (v) => DIFFICULTIES.includes(v) },
   // 本房座位上限 (业主裁决 B5, docs/META.md §1.9): the HOST resizes the room it is already in — the same host-only,
@@ -819,6 +827,15 @@ export const C2S = {
     code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v),
     seatCap: (v) => isInt(v, MIN_SEATS, SEAT_CAP),
   },
+  'room.setMaxSeats': { n: (v) => ROOM_CAPACITIES.includes(v) },
+  'room.setAllowSpectators': { on: isBool },
+  'room.setRecruitWanted': { on: isBool },
+  'room.setInviteOnly': { on: isBool },
+  'room.setExtendedUnite': { on: isBool },
+  'room.setUniteRotation': { on: isBool },
+  'room.setUniteHumanFirst': { on: isBool },
+  'room.setUniteHelpers': { n: (v) => Number.isInteger(v) && v >= 2 && v <= 10 && v % 2 === 0 },
+  'room.setAiBand': { seat: (v) => Number.isInteger(v) && v >= 0 && v < 20, bandId: (v) => typeof v === 'string' && v.length <= 64 },
   // 重构模拟（模式扩展-重构模拟，mode 'recon'）：自由选队 —— 赛前任何在座玩家把自己移到 1..RECON.MAX_TEAMS
   // 号队伍（RECON.MIN_TEAMS..MAX_TEAMS，每队 ≤ RECON.TEAM_SIZE；共享常量见 shared/constants.js）。
   // 新增 C2S 类型 ⇒ `PROTOCOL_VERSION` 不动（先例 `records.mine` / `g.unequip`）：老客户端一个字节都不发，
@@ -1129,6 +1146,7 @@ export const C2S = {
 // why `PROTOCOL_VERSION` does not move (same precedent as `hello.auth` / `records.mine`).
 export const S2C = [
   'welcome', 'ok', 'error', 'pong',
+  'friend.state', 'room.invite',
   'room.state', 'room.closed',
   // 上局战绩的答案（server/lobby.js `records.mine`）：`records.latest { record: publicRecord|null }`，只发给请求者。
   // `record` 的**可见范围**由服务端收窄（docs/RECORDS.md §可见性）：本人看到完整明细，同房的人看到昵称，

@@ -123,7 +123,7 @@ export const skinFor = (charId) => (str(charId) ? (skinsStore.get()[SKINS_KEY] |
  * resolved URLs, not raw manifest fields.
  * @param {string} charId operator id (`char_498_inside`)
  * @returns {{ id: string, name: string, group: string, playable: boolean, portrait: string|null, avatar: string|null,
- *   illust: string|null }[]}
+ *   illust: string|null, ownArt: string|null }[]}
  */
 export function availableSkins(charId) {
   const id = str(charId);
@@ -155,6 +155,9 @@ export function availableSkins(charId) {
       portrait,
       avatar,
       illust,
+      // the same art but the SKIN's only (null when it ships no picture of its own). The enlarged preview and the detail
+      // header prefer it, so they show the skin and not the operator's picture that `portrait` falls back to.
+      ownArt: ownArt || null,
       fallbackArt: !ownArt && !str(skin.avatar),
       own: false,
     });

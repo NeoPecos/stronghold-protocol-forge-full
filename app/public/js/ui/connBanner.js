@@ -6,7 +6,7 @@
 // below it (classes instead of CSS :has(), which Firefox ESR / Safari < 15.4 lack).
 
 import { html, Button, Icon, useTicker } from './components.js';
-import { net, CLIENT_ERR_TEXT } from '../net.js';
+import { net, CLIENT_ERR_TEXT, saveAccountAuth } from '../net.js';
 import { useStore, shallowEqual } from '../store.js';
 import { useDocClass } from './device.js';
 import { t } from '../../../shared/i18n.js';
@@ -44,6 +44,7 @@ export function ConnectionBanner() {
   const secs = conn.retryAt ? Math.max(0, Math.ceil((conn.retryAt - Date.now()) / 1000)) : 0;
   const replaced = conn.status === 'closed' && conn.lastError?.code === 'REPLACED';
   const rejected = conn.status === 'connected' && !!conn.lastError; // hello refused (version, server full…)
+  const authLost = rejected && conn.lastError?.code === 'AUTH_REQUIRED'; // account gate: the ticket is gone / stale
   const versionMismatch = rejected && conn.lastError.text === CLIENT_ERR_TEXT.VERSION;
   // Short transitional states (a rename re-sends hello on the live socket) only show if they linger.
   const transient = conn.status === 'connecting' || conn.status === 'handshaking' || (conn.status === 'connected' && !rejected);
@@ -55,7 +56,15 @@ export function ConnectionBanner() {
   const action = conn.status === 'reconnecting' ? { label: t('立即重连'), run: () => net.retryNow() }
     : conn.status === 'closed' ? { label: replaced ? t('在此页面继续') : t('重新连接'), run: () => net.connect() }
       : versionMismatch ? { label: t('刷新页面'), run: () => location.reload() }
-        : rejected ? { label: t('重试'), run: () => net.reconnectNow() } : null;
+        : authLost ? { label: t('重新登录'), run: () => { // the account ticket no longer matches: drop it and go back to the title/login form
+            try {
+              saveAccountAuth(null);
+              sessionStorage.removeItem('sp.token');
+              localStorage.removeItem('sp.tokens');
+            } catch { /* storage off */ }
+            location.reload();
+          } }
+          : rejected ? { label: t('重试'), run: () => net.reconnectNow() } : null;
   return html`<div class=${`conn-banner${transient ? ' conn-banner--soft' : ''}`} role="alert">
     <${Icon} name="wifiOff" />
     <span>${text}</span>

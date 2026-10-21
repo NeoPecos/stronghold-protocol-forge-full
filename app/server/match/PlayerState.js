@@ -152,7 +152,10 @@ export class PlayerState {
     this.gd = m.gd;
     this.playerId = seat.playerId;
     this.seat = seat.seat;
+    /** 房主指定的开局策略（room.setAiBand，仅 AI 席位） */
+    this.forcedBandId = seat.bandId || null;
     this.name = seat.name;
+    this.avatar = !seat.isBot ? seat.avatar || null : null;
     this.isBot = !!seat.isBot;
     this.connected = this.isBot ? true : !!seat.connected;
     this.left = false;

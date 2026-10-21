@@ -154,6 +154,9 @@ export function botPickBand(m, ps) {
   const gd = ps?.gd || m.gd;
   const ids = gd.bandIds();
   if (!ids.length) return gd.defaultBandId;
+  // 房主按席位指定（room.setAiBand，Match opts.seats[].bandId）: 该策略有提供且没人拿就照办
+  const forced = ps?.forcedBandId;
+  if (forced && ids.includes(forced) && !(typeof m.bandTaken === 'function' && m.bandTaken(forced, ps.playerId))) return forced;
   const lateFunds = (id) => /暂存/.test(String(gd.band(id)?.desc || ''));
   const reserved = new Set(ps && typeof m.alivePlayers === 'function'
     ? m.alivePlayers().filter((p) => p !== ps).flatMap((p) => gd.bandBondIds(p.bandId))

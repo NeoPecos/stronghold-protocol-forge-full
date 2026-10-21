@@ -108,10 +108,11 @@ export function SkinSection({ charId }) {
   const chosen = chosenSkin(id, s[SKINS_KEY]);
   // the tile art of a row is already resolved (its own portrait, else the operator's); `face` is the same appearance's
   // 1:1 avatar, which CSS draws instead of the 1:2 art when the panel is too short for it. The enlarged preview prefers
-  // the 立绘 — a 1024 px+ picture — and is only offered for a skin (the 默认 tile's own portrait is not a poster)
+  // the skin's OWN picture (`ownArt`: its 立绘 / portrait) and then its 1:1 avatar — never the operator's fallback
+  // portrait, which is the same picture for every skin of that operator. Offered for a skin only (默认 is no poster).
   const shown = rows.map((row) => ({ ...row, art: row.portrait || row.avatar || null, face: row.avatar || null }));
   const previewRow = preview ? rows.find((x) => !x.own && x.id === preview) || null : null;
-  const previewArt = previewRow ? (previewRow.illust || previewRow.portrait || previewRow.avatar) : null;
+  const previewArt = previewRow ? (previewRow.ownArt || previewRow.avatar || previewRow.illust || previewRow.portrait) : null;
 
   return html`<section class="lo-sec lo-sec--skin" data-testid="skin-section">
     <header class="lo-sec__head">

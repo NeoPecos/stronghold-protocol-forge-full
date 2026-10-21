@@ -1,12 +1,7 @@
 // 名片干员: the portrait a doctor shows on the room's seat card (screens/room.js) and on the strategy draft's name-card rows
 // (screens/bandDraft.js) — the operator the player picked (room.card; room.state seats[].card), else one of the 5★/6★
 // operators chosen by the player id, the same on every client.
-//
-// 立绘走**唯一解析链**（`ui/portraitChain.js`，`owner` = **这一席是谁**）：一张座位卡画的正是「那个人长什么样」，
-// 而换装（皮肤层）由引擎按座位记（`room.state` 的 `seats[].appearance.picks`，`main.js syncRoomAppearance` 并进
-// `peerAppearance`）。从前这里直连 `chessPortraitUrl`，于是同房的人选了时装、座位卡上还是原版 —— 那恰好是
-// `room.appearance` 这条消息存在的理由那一半。
-import { portraitUrlOf, currentAppearanceLookup } from './portraitChain.js';
+import { chessPortraitUrl } from './assetUrls.js';
 
 /** FNV-1a of a string (the portrait pick: the same operator for a player on every client). */
 function hash32(s) {
@@ -38,14 +33,42 @@ export function cardOperators(chessList) {
  * the 5★/6★ operators chosen by the player id — the same on every client (null before the data loads).
  * @param {any} seat room.state seat @param {{ pool: any[], byChar: Map<string, any>, m: any, myId: any, myCard: string }} ctx
  */
+
+/** 头像 id（session.avatar：charId / e2:charId / skin:id）→ 同一干员的立绘 URL（找不到返回 null，回退旧规则）。 */
+function avatarPortrait(m, avatarId) {
+  const chars = m && typeof m === 'object' ? m.chars : null;
+  const raw = typeof avatarId === 'string' ? avatarId : '';
+  if (!chars || !raw) return null;
+  // 自定义上传头像 / 外部 URL 无法映射到干员，保持旧规则
+  if (/^(?:data:|https?:|\/)/i.test(raw)) return null;
+  let id = raw;
+  let wantE2 = false;
+  if (id.startsWith('skin:')) {
+    const parts = id.split(':');
+    id = parts[1] || '';
+    wantE2 = true;
+  } else if (id.startsWith('e2:')) {
+    id = id.slice(3);
+    wantE2 = true;
+  } else if (id.endsWith('_2')) {
+    id = id.slice(0, -2);
+    wantE2 = true;
+  } else if (id.endsWith('_1')) {
+    id = id.slice(0, -2);
+  }
+  const entry = chars[id];
+  if (!entry) return null;
+  return (wantE2 ? entry.portraitE2 || entry.portrait : entry.portrait) || null;
+}
+
 export function seatPortrait(seat, { pool, byChar, m, myId, myCard }) {
   if (!seat || seat.playerId == null) return null;
+  // 头像与卡片立绘保持一致：优先用该座位头像选用的同一干员出立绘（只影响取哪张图，不改尺寸/布局）
+  const viaAvatar = avatarPortrait(m, seat.avatar);
+  if (viaAvatar) return viaAvatar;
   const pick = (seat.playerId === myId && myCard) || seat.card;
   const rec = pick && byChar ? byChar.get(pick) : null;
-  // 这一席是谁的选择就用谁的：`owner` = 座位的 `playerId`（我自己那一席由 `setMyPlayerId` 认出来，与
-  // `owner === undefined` 等价）。没有换装时两步都落回 `chessPortraitUrl` 那条既有分支。
-  const opts = { owner: seat.playerId, lookup: currentAppearanceLookup() };
-  if (rec) return portraitUrlOf(m, rec, opts);
+  if (rec) return chessPortraitUrl(m, rec);
   if (!Array.isArray(pool) || !pool.length) return null;
-  return portraitUrlOf(m, pool[hash32(seat.playerId) % pool.length], opts);
+  return chessPortraitUrl(m, pool[hash32(seat.playerId) % pool.length]);
 }

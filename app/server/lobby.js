@@ -181,7 +181,7 @@
 //     the match are the grace timers already running for its disconnected seats.
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { DIFFICULTIES, ERR, MAX_SEATS, MIN_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, maxSeatsFrom, clampSeats, RECON } from '../shared/constants.js';
+import { DIFFICULTIES, ERR, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, maxSeatsFrom, clampSeats, RECON } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkConflictPicks, checkDiyPicks, charPotentialChanges, PACK_MSG_LIMITS, CHAT_LIMITS } from '../shared/protocol.js';
 import { modSetOf, isModId, modSetDrift } from '../shared/modIdentity.js';
 import { normalizeSupportConfig, checkSupport, supportPicker, supportCapacity, supportTiers } from '../shared/support.js';
@@ -442,6 +442,15 @@ export class Room {
      * put every human seat before every AI seat (Match opts.aiPicksLast). Kept across the room's matches.
      */
     this.aiPicksLast = false;
+    this.aiBands = {};
+    this.allowSpectators = true;
+    this.recruitWanted = true;
+    this.inviteOnly = false;
+    this.invited = new Set();
+    this.extendedUnite = mode === 'coop' && seatCap > DEFAULT_SEATS;
+    this.uniteRotation = true;
+    this.uniteHumanFirst = true;
+    this.uniteHelpers = 2;
     /**
      * 本房间的 Fever 音乐（颂乐人偶 mod，`room.feverMusic`）：`{ track, start, end }`，`track` 是
      * `GET /api/music` 的曲目 id；`null` = 包内默认两首。房主、开局前可改，变更即写进 `room.state` 广播给全员。
@@ -593,7 +602,16 @@ export class Room {
       hostId: this.hostId,
       mode: this.mode,
       difficulty: this.difficulty,
+      maxSeats: this.seats.length,
       aiPicksLast: this.aiPicksLast,
+      aiBands: { ...this.aiBands },
+      allowSpectators: this.allowSpectators,
+      recruitWanted: this.recruitWanted,
+      inviteOnly: this.inviteOnly,
+      extendedUnite: this.extendedUnite,
+      uniteRotation: this.uniteRotation,
+      uniteHumanFirst: this.uniteHumanFirst,
+      uniteHelpers: this.uniteHelpers,
       // 房内聊天模式：客户端据此决定要不要显示输入框。**服务端强制**（`chat` / `quickMsg` 各自再判一次），
       // 这个字段只是让界面说实话。
       chatMode: this.chatMode,
@@ -995,6 +1013,28 @@ export class Lobby {  /**
     return OK;
   }
 
+  publicRecruitingRooms() {
+    const rooms = [];
+    for (const room of this.rooms.values()) {
+      if (room.mode !== 'coop' || room.match || room.test || room.private || room.inviteOnly || room.recruitWanted === false || room.freeSeat() < 0) continue;
+      const humans = room.activeHumans();
+      if (!humans.some((seat) => seat.connected)) continue;
+      const host = humans.find((seat) => seat.playerId === room.hostId) || humans[0];
+      rooms.push({
+        code: room.code,
+        name: `${host.name}的同盟`,
+        hostName: host.name,
+        difficulty: room.difficulty,
+        humans: humans.length,
+        maxSeats: room.seats.length,
+        inMatch: false,
+        pluginCount: room.content?.plugins?.length || 0,
+        modded: room.modded,
+      });
+    }
+    return rooms;
+  }
+
   // ---------------------------------------------------------------------------------------------------
   // net.js handler interface
   // ---------------------------------------------------------------------------------------------------
@@ -1132,8 +1172,10 @@ export class Lobby {  /**
    */
   handleMessage(session, msg, ctx = null) {
     switch (msg.t) {
+      case 'lobby.presence': return { ok: true, online: [...this.registry.all()].filter((peer) => peer.connected).length, rooms: this.publicRecruitingRooms() };
       case 'room.create': return this.create(session, msg);
       case 'room.join': return this.join(session, msg);
+      case 'room.takeSeat': return this.takeSeat(session, msg);
       case 'room.leave': return this.leave(session);
       // 上局战绩（server/matchRecords.js, docs/RECORDS.md）：空消息，回执是**只发给请求者**的
       // `records.latest`。没有 `records` 时照样回一条 `record: null` —— 客户端因此不需要「服务器有没有开这个
@@ -1147,12 +1189,22 @@ export class Lobby {  /**
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setSeatCap': return this.setSeatCap(session, msg);
+      case 'room.setMaxSeats': return this.setMaxSeats(session, msg);
+      case 'room.setAllowSpectators': return this.setAllowSpectators(session, msg);
+      case 'room.setRecruitWanted': return this.setRecruitWanted(session, msg);
+      case 'room.setInviteOnly': return this.setInviteOnly(session, msg);
+      case 'room.setExtendedUnite': return this.setExtendedUnite(session, msg);
+      case 'room.setUniteRotation': return this.setUniteRotation(session, msg);
+      case 'room.setUniteHumanFirst': return this.setUniteHumanFirst(session, msg);
+      case 'room.setUniteHelpers': return this.setUniteHelpers(session, msg);
+      case 'room.setAiBand': return this.setAiBand(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       // 重构模拟（mode 'recon'）的自由选队：赛前、本房成员、目标队伍未满（≤ RECON.TEAM_SIZE）
       case 'room.setTeam': return this.setTeam(session, msg);
       // 房间内改本房间的模组集合（G1/G2，docs/WORKSHOP.md §1.9.3）：房主、开局前、且没有真人已就绪
-      case 'room.mods': return this.setRoomMods(session, msg);
-      // 房间的 Fever 音乐（颂乐人偶 mod）：房主、开局前；变更广播 room.state
+      // 内容由服务器固定，房主不能改包；Fever 音乐仍可设置。
+      case 'room.mods':
+        return fail(ERR.MOD_SET_LOCKED, 'this server runs a fixed mod set; rooms cannot change it');
       case 'room.feverMusic': return this.setFeverMusic(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
@@ -1168,6 +1220,7 @@ export class Lobby {  /**
       // 外观选择（皮肤层）：别人看到的你长什么样 —— 纯展示，比赛中也接受，变更即广播
       case 'room.appearance': return this.appearance(session, msg);
       case 'room.skins': return this.skins(session, msg);
+      case 'account.avatar': return this.avatar(session, msg);
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
       // 野排匹配 (quick match): the queue lives in server/matchmaking.js; these two cases are its only entry points
@@ -1424,9 +1477,12 @@ export class Lobby {  /**
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty, mods, modIds, chatMode, seatCap, dev, stage, teamCount, test } = {}) {
+  create(session, { mode, difficulty, mods, modIds, chatMode, seatCap, capacity, dev, stage, teamCount, test } = {}) {
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
+    // 20 人同盟：建房时可指定档位；不指定时用 DEFAULT_SEATS（solo 恒 1 席）
+    const requestedCap = seatCap ?? capacity ?? this.opts.maxSeats;
+    if (mode === 'coop' && (!Number.isInteger(requestedCap) || requestedCap < MIN_SEATS || requestedCap > this.opts.maxSeats)) return fail(ERR.BAD_MSG, 'invalid capacity');
     const cur = this.roomOf(session);
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     const gate = this.checkModSet({ mods });
@@ -1434,7 +1490,8 @@ export class Lobby {  /**
     // The room's own set (W-A, DESIGN §28.9): every id must name a pack THIS server loaded, and the refusal names both
     // what was not found and what is on offer — a client cannot guess its way into a set the server cannot run. Absent
     // or `[]` = today's behaviour (the room declares nothing and `room.state` gets no `mods`).
-    const resolved = resolveRoomModSet(Array.isArray(modIds) ? modIds : [], this.workshop?.mods);
+    // 本服务器内容固定：忽略客户端声明的 modIds，房间恒按服务器已加载的全部模组运行。
+    const resolved = resolveRoomModSet([], this.workshop?.mods);
     if (!resolved.ok) {
       const unknown = resolved.unknown.length ? resolved.unknown.join(', ') : '(none)';
       const available = resolved.available.length ? resolved.available.join(', ') : '(none)';
@@ -1468,7 +1525,7 @@ export class Lobby {  /**
     //
     // **只作用于 co-op**：solo 房今天也是按 `this.opts.maxSeats` 建座位数组的（客户端 `normalizeSeats` 按
     // `mode:'solo'` 只画一张卡），改掉它就会移动每一个 solo 帧 —— 所以 solo 一律忽略这个字段。
-    const roomCap = (mode === 'coop' || mode === 'recon') && seatCap != null ? clampSeats(seatCap, this.opts.maxSeats) : this.opts.maxSeats;
+    const roomCap = mode === 'coop' ? requestedCap : mode === 'recon' ? clampSeats(seatCap ?? this.opts.maxSeats, this.opts.maxSeats) : 1;
     // 开发者模式（工坊包 dev-ext 的「全量模拟」）：只有 `mode:'solo'` 收；`stage` 必须点名**本服务器已加载的一张图**，
     // 否则**点名拒绝**（不静默忽略 —— 一个打不出来的图会让玩家以为是地图坏了）。校验放在建房之前，避免留下半成品房间。
     //
@@ -1567,6 +1624,7 @@ export class Lobby {  /**
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
+    if (room.inviteOnly && session.role !== 'admin' && !room.invited.has(session.playerId)) return fail(ERR.ROOM_INVITE_ONLY);
     // 每名真人须同意（W7, DESIGN §28.53）：**占了玩家座位**就要先对**这一份**字节表态。判在占座**之前**，所以
     // 没同意的人进不去（不是「进来了但只能看着」）。AI 与观战者不在这一条线上（他们走不到这里：AI 由 `addBot`
     // 建座位，观战者走 `spectate`）。
@@ -1594,6 +1652,30 @@ export class Lobby {  /**
     return OK;
   }
 
+  /**
+   * room.takeSeat { seat } — move into a CHOSEN free seat (grouped room screen, phase B).
+   * A seated player moves over; a spectator gives up its spectator seat. Ready state resets.
+   */
+  takeSeat(session, { seat }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    const idx = Number(seat);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= room.seats.length) return fail(ERR.BAD_TARGET);
+    if (room.seats[idx]) return fail(ERR.ROOM_FULL, 'seat taken');
+    const spectator = room.spectatorOf(session.playerId);
+    const old = room.seatOf(session.playerId);
+    if (!spectator && !old) return fail(ERR.NOT_IN_ROOM);
+    this.dropReplay(room, session.playerId);
+    if (old) room.seats[old.seat] = null;
+    if (spectator) room.spectators = room.spectators.filter((s) => s.playerId !== session.playerId);
+    room.seats[idx] = this.humanSeat(idx, session);
+    if (!room.hostId) room.hostId = session.playerId;
+    session.roomCode = room.code;
+    this.broadcastState(room);
+    return OK;
+  }
+
   leave(session) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -1618,9 +1700,11 @@ export class Lobby {  /**
     }
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
+    if (room.allowSpectators === false) return fail(ERR.BAD_TARGET, 'spectators are disabled in this room');
+    if (room.inviteOnly && session.role !== 'admin' && !room.invited.has(session.playerId)) return fail(ERR.ROOM_INVITE_ONLY);
     if (room.spectators.length >= MAX_SPECTATORS) return fail(ERR.ROOM_FULL, 'no free spectator seat');
     if (cur) this.removeMember(cur, session.playerId);
-    room.spectators.push({ playerId: session.playerId, name: session.name, connected: session.connected });
+    room.spectators.push({ playerId: session.playerId, name: session.name, avatar: session.avatar || null, connected: session.connected });
     session.roomCode = room.code;
     session.notice = null;
     session.pendingResult = null;
@@ -1662,6 +1746,65 @@ export class Lobby {  /**
       seat.ready = ready;
       this.broadcastState(room);
     }
+    return OK;
+  }
+
+  /** 20 人同盟房间规则：允许观战（关闭后新的观战者进不来，已在场的观战者不受影响）。 */
+  setAllowSpectators(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.mode === 'solo') return fail(ERR.BAD_TARGET, 'a solo room has no spectators');
+    if (room.allowSpectators === on) return OK;
+    room.allowSpectators = on;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /** 20 人同盟房间规则：期望路人加入（关闭后不再主动招募路人，房间仍可凭密钥进入）。 */
+  setRecruitWanted(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.mode === 'solo') return fail(ERR.BAD_TARGET, 'a solo room has no matchmaking');
+    if (room.recruitWanted === on) return OK;
+    room.recruitWanted = on;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /** 20 人同盟房间规则：仅邀请（不出现在模拟邀约/公开列表，加入仍需同盟密钥）。 */
+  setInviteOnly(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.mode === 'solo') return fail(ERR.BAD_TARGET, 'a solo room cannot be invite-only');
+    if (room.inviteOnly === on) return OK;
+    room.inviteOnly = on;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /** 20 人同盟：房主在开局前调整房间人数上限（ROOM_CAPACITIES 档位），不能小于已被占用的席位。 */
+  setMaxSeats(session, { n }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode !== 'coop') return fail(ERR.BAD_TARGET, 'a solo room has one seat');
+    if (!ROOM_CAPACITIES.includes(n) || n > this.opts.maxSeats) return fail(ERR.BAD_MSG, 'invalid capacity');
+    const seats = room.seats;
+    const lastOccupied = seats.reduce((acc, s, i) => (s ? i : acc), -1);
+    if (n <= lastOccupied) return fail(ERR.BAD_TARGET, 'seats are occupied');
+    if (room.seatCapTo(n) !== n) return fail(ERR.BAD_TARGET, 'seats are occupied');
+    // 2026-10-20 a5：人数一改，扩展联防的默认值跟着人数走（4 人关、超过 4 人开；房主之后仍可手动改）
+    const uniteDefault = n > DEFAULT_SEATS;
+    if (room.extendedUnite !== uniteDefault) {
+      room.extendedUnite = uniteDefault;
+      if (!uniteDefault) room.uniteHelpers = 2;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+    }
+    this.broadcastState(room);
     return OK;
   }
 
@@ -1720,12 +1863,72 @@ export class Lobby {  /**
     if (room.seatCap === seatCap) return OK;   // idempotent: no state change, so no broadcast either
     this.dropReplay(room, session.playerId);
     room.seatCapTo(seatCap);
+    const uniteDefault = seatCap > DEFAULT_SEATS;
+    if (room.extendedUnite !== uniteDefault) {
+      room.extendedUnite = uniteDefault;
+      if (!uniteDefault) room.uniteHelpers = 2;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+    }
     this.log.info(`[lobby] ${room.code} seat cap set to ${seatCap} by ${session.name}`);
     this.broadcastState(room);
     return OK;
   }
 
   /** 「AI 队友最后选择」 (GitHub #338): host-only, before the match, co-op rooms only (a solo room has no AI seat). */
+  /** B：扩展联防（开启后沿用 0.3.0 的 5 轮最多 10 名协防 + 每少一对 +10 秒）。 */
+  setExtendedUnite(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode !== 'coop') return fail(ERR.BAD_TARGET, 'solo rooms have no unite rules');
+    this.dropReplay(room, session.playerId);
+    if (room.extendedUnite !== on) {
+      room.extendedUnite = on;
+      if (!on) room.uniteHelpers = 2;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /** B：联防护卫轮换（开启：近 3 轮未协防的博士优先）。 */
+  setUniteRotation(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode !== 'coop' || !room.extendedUnite) return fail(ERR.BAD_TARGET, 'extended unite is off');
+    this.dropReplay(room, session.playerId);
+    if (room.uniteRotation !== on) { room.uniteRotation = on; this.broadcastState(room); }
+    return OK;
+  }
+
+  /** B：真人先手（真人席位排在 AI 席位之前）。 */
+  setUniteHumanFirst(session, { on }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode !== 'coop' || !room.extendedUnite) return fail(ERR.BAD_TARGET, 'extended unite is off');
+    this.dropReplay(room, session.playerId);
+    if (room.uniteHumanFirst !== on) { room.uniteHumanFirst = on; this.broadcastState(room); }
+    return OK;
+  }
+
+  /** B：协防人数（偶数 2..limit）。 */
+  setUniteHelpers(session, { n }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode !== 'coop' || !room.extendedUnite) return fail(ERR.BAD_TARGET, 'extended unite is off');
+    if (!Number.isInteger(n) || n < 2 || n % 2 !== 0 || n > uniteLimitOf(room.seats.filter(Boolean).length)) return fail(ERR.BAD_TARGET);
+    this.dropReplay(room, session.playerId);
+    if (room.uniteHelpers !== n) { room.uniteHelpers = n; this.broadcastState(room); }
+    return OK;
+  }
+
   setAiPicksLast(session, { on }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -1955,6 +2158,28 @@ export class Lobby {  /**
    * when it is the set the room already has. The host's result replay (a settlement screen still open) is dropped only
    * when the set did change: re-applying the same plugins, or a refused set, leaves it.
    */
+  /**
+   * room.setAiBand { seat, bandId } — 房主按席位指定 AI 队友的开局策略（bandId，空串＝恢复自动）。
+   * Kept across the room's matches; a removed/respawned bot seat simply loses its entry.
+   */
+  setAiBand(session, { seat, bandId }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode === 'solo') return fail(ERR.BAD_TARGET, 'solo rooms have no AI teammates');
+    const idx = Number(seat);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= room.seats.length) return fail(ERR.BAD_TARGET);
+    const s = room.seats[idx];
+    if (!s || !s.isBot) return fail(ERR.BAD_TARGET, 'not an AI seat');
+    const id = typeof bandId === 'string' ? bandId.trim().slice(0, 64) : '';
+    this.dropReplay(room, session.playerId);
+    if (id) room.aiBands[idx] = id;
+    else delete room.aiBands[idx];
+    this.broadcastState(room);
+    return OK;
+  }
+
   setPlugins(session, { plugins }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -2117,7 +2342,7 @@ export class Lobby {  /**
     return OK;
   }
 
-  addBot(session) {
+  addBot(session, { seat } = {}) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
@@ -2402,6 +2627,24 @@ export class Lobby {  /**
    * *does*; a skin changes only what it looks like, and it is public — a teammate switching model mid-match is
    * harmless, and the next `m.public` broadcast carries it to everyone.
    */
+  avatar(session, { avatar }) {
+    if (!isAvailableAvatar(this.safeData()?.assets, avatar)) return fail(ERR.BAD_TARGET, 'unknown avatar');
+    session.avatar = avatar;
+    const room = this.roomOf(session);
+    if (!room) return OK;
+    const seat = room.seatOf(session.playerId) || room.spectatorOf(session.playerId);
+    if (seat) seat.avatar = avatar;
+    const match = room.match;
+    const player = match?.players?.get?.(session.playerId);
+    if (player) {
+      player.avatar = avatar;
+      match.markPublic?.();
+      match.flush?.();
+    }
+    this.broadcastState(room);
+    return OK;
+  }
+
   skins(session, { skins }) {
     const room = this.roomOf(session);
     const ids = operatorCharIds(this.dataFor(room));
@@ -2591,7 +2834,9 @@ export class Lobby {  /**
       // a setting checked for another content is filtered to this room's data (header "Gameplay plugins")
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
-        seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, connected: s.connected,
+        seat: s.seat, playerId: s.playerId, name: s.name, avatar: s.avatar || null, isBot: s.isBot, connected: s.connected,
+        // 房主按席位指定的 AI 开局策略（room.setAiBand）
+        bandId: s.isBot ? (room.aiBands[s.seat] || null) : null,
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,
         ops: own ? own.ops : null,
@@ -2649,6 +2894,11 @@ export class Lobby {  /**
         devStage: room.devStage || null,
         // 「AI 队友最后选择」 (GitHub #338): fixed for the match
         aiPicksLast: room.mode !== 'solo' && room.aiPicksLast === true,
+        extendedUnite: room.mode === 'coop' && room.extendedUnite === true,
+        uniteRotation: room.mode === 'coop' && room.extendedUnite === true && room.uniteRotation === true,
+        uniteHumanFirst: room.mode === 'coop' && room.extendedUnite === true && room.uniteHumanFirst === true,
+        uniteHelpers: room.mode === 'coop' && room.extendedUnite === true
+          ? Math.min(room.uniteHelpers, uniteLimitOf(seats.length)) : 2,
         seats,
         // the spectator seats (header): watched like eliminated players, never players
         spectators: room.spectators.map((s) => s.playerId),
@@ -3022,7 +3272,7 @@ export class Lobby {  /**
   /** @returns {Seat} */
   humanSeat(idx, session) {
     return {
-      seat: idx, playerId: session.playerId, name: session.name, isBot: false, ready: false, connected: session.connected, left: false,
+      seat: idx, playerId: session.playerId, name: session.name, avatar: session.avatar || null, isBot: false, ready: false, connected: session.connected, left: false,
       loadout: session.loadout || null,
       support: session.support || null,
       ops: session.ops || null,
@@ -3316,3 +3566,6 @@ export class Lobby {  /**
     this.roomHooks.fire(room, event, payload);
   }
 }
+
+// phase B：联防协防人数上限（0.3.0 shared/playerCapacity.js 的同一公式）
+const uniteLimitOf = (players) => Math.min(10, Math.max(2, Math.floor(Math.max(1, players) / 4) * 2));

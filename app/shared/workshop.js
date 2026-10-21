@@ -4594,7 +4594,25 @@ function mergeWorkshopSkins(data, packs, report) {
   const prevSkins = isPlainObj(assets.skins) ? assets.skins : {};
   const next = { ...prevSkins };
   for (const [charId, arr] of Object.entries(byChar)) next[charId] = [...(Array.isArray(prevSkins[charId]) ? prevSkins[charId] : []), ...arr];
-  data.assets = { ...assets, skins: next };
+  // The a5 loadout and battle renderer read chars[charId].skins, while Forge's
+  // skin-picker reads assets.skins. Publish each installed outfit in both views
+  // so a fixed server pack remains selectable without a personal mod switch.
+  const chars = isPlainObj(assets.chars) ? { ...assets.chars } : {};
+  for (const [charId, arr] of Object.entries(byChar)) {
+    const ch = chars[charId];
+    if (!isPlainObj(ch)) continue;
+    const variants = isPlainObj(ch.skins) ? { ...ch.skins } : {};
+    for (const skin of arr) {
+      if (isPlainObj(variants[skin.id])) continue;
+      variants[skin.id] = {
+        name: skin.name,
+        ...(skin.series ? { group: skin.series } : {}),
+        ...(isPlainObj(skin.art) ? skin.art : {}),
+      };
+    }
+    chars[charId] = { ...ch, skins: variants };
+  }
+  data.assets = { ...assets, chars, skins: next };
   report.skins = Object.fromEntries(Object.entries(byChar).map(([charId, arr]) => [charId, arr.length]));
   // 启动日志那一份（`workshopSummary`）：按**包**数，而不是按干员。`report.skins` 的键是 charId（消费点按
   // 干员问「有哪几套」），而日志说的是「这个包带来了几套」—— 两个问题，所以两张表，都从同一趟循环里出来。

@@ -3,7 +3,7 @@
    footage, video 7:43–7:51; [ASSUMED] the timings, estimated frame by frame). Timeline: the ship zooms out of the screen (0–1 s), the panel flashes up (1–1.45 s), and
    it holds until BATTLE_CHECK ends; then it fades (.is-leaving, BOOT_LEAVE_MS). */
 .pboot {
-  --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
+  --px: min(.01rem, calc(100vw / 1920), calc(100dvh / 1080));
   --teal: #3fd6b4;
   --teal-deep: #0c2a25;
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; overflow: hidden; pointer-events: none;
@@ -94,7 +94,7 @@
    screen a light-grey band slides in from the left (the STRONGHOLD PROTOCOL mark, the contour map, the ship's outline),
    a teal fill wipes over it with 请选择策略 and the ring, the robot's square beside it; then it folds shut (1.7 s). */
 .tbanner {
-  --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
+  --px: min(.01rem, calc(100vw / 1920), calc(100dvh / 1080));
   --teal: #52d6b0;
   --ink: #0b1f1b;
   position: fixed; inset: 0; z-index: 70; pointer-events: none;

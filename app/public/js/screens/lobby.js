@@ -23,7 +23,8 @@ import { useHubBackdrop, HubBackdrop, HubRadar, BackdropSettings, BackdropGlyph,
 
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MIN_SEATS, MAX_SPECTATORS, modeIdFor, clampSeats, ERR, ERR_TEXT, RECON } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS, MAX_SPECTATORS, modeIdFor, clampSeats, ERR, ERR_TEXT, RECON } from '../../../shared/constants.js';
+import { rememberedCapacity, remembersCapacity, setCapacityRemember } from '../ui/roomPrefs.js';
 import { RANDOM_MODE } from '../../../shared/randomMode.js';
 import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
@@ -597,8 +598,10 @@ function JoinLine({ text }) {
  * the cap is already fixed and `room.state.seatCap` merely describes it.
  * @param {{ value: number, min: number, max: number, onChange: (n: number) => void }} props
  */
-function SeatCapPicker({ value, min, max, onChange }) {
+function SeatCapPicker({ value, min, max, onChange, mode = 'coop' }) {
   if (!(max > min)) return null;
+  const choices = null;
+  const [remember, setRemember] = useState(remembersCapacity);
   const pct = Math.round(((value - min) / (max - min)) * 100);
   return html`<div class="seat-cap">
     <div class="seat-cap__head">
@@ -606,10 +609,14 @@ function SeatCapPicker({ value, min, max, onChange }) {
       <span class="seat-cap__name">${t('本房间人数上限')}</span>
       <span class="seat-cap__value num">${value}<span class="t-dim"> / ${max}</span></span>
     </div>
-    <input class="seat-cap__slider" type="range" min=${min} max=${max} step="1" value=${value}
+    ${choices ? html`<div class="seat-cap__choices" role="radiogroup" aria-label=${t('本房间人数上限')}>
+      ${choices.map((n) => html`<button type="button" class=${`seat-cap__choice${n === value ? ' is-on' : ''}`}
+        role="radio" aria-checked=${n === value} onClick=${() => onChange(n)}>${n}</button>`)}</div>
+      <label class="seat-cap__remember"><input type="checkbox" checked=${remember}
+        onChange=${(e) => { const on = e.currentTarget.checked; setRemember(on); setCapacityRemember(on, value); }} />${t('记住本次选择')}</label>` : html`<input class="seat-cap__slider" type="range" min=${min} max=${max} step="1" value=${value}
       style=${`--pct:${pct}%`} aria-label=${t('本房间人数上限')}
       aria-valuemin=${min} aria-valuemax=${max} aria-valuenow=${value}
-      onInput=${(e) => onChange(Number(e.currentTarget.value))} />
+      onInput=${(e) => onChange(Number(e.currentTarget.value))} />`}
     <div class="seat-cap__note">${t('服务器允许最多 {max} 人；本同盟开 {value} 张座位卡', { max, value })}</div>
   </div>`;
 }
@@ -687,8 +694,11 @@ const ModManagerSlot = modComponent('lobby.modManager', () => null);
  * @param {string} roomMode 'solo' | 'coop'
  * @returns {boolean}
  */
-export const ROOM_MOD_PICKER_MODES = Object.freeze(['solo', 'coop', 'recon']);
-export function hasRoomModPicker(roomMode) { return ROOM_MOD_PICKER_MODES.includes(roomMode); }
+export const ROOM_MOD_PICKER_MODES = Object.freeze(['solo', 'coop']);
+export function hasRoomModPicker(roomMode) {
+  // 本服务器内容固定（服务端加载什么就全跑什么），玩家侧不提供任何模组开关 —— 入口恒不渲染。
+  return false;
+}
 
 
 /**
@@ -840,7 +850,7 @@ function ProtocolSelect({ card, roomMode, random, variant, difficulty, onDifficu
           </div>` : null}
           ${hasRoomModPicker(roomMode) ? html`<${ModPicker} selected=${selectedMods} onToggle=${onToggleMod} />` : null}
           ${roomMode === 'coop' || roomMode === 'recon'
-            ? html`<${SeatCapPicker} value=${seatValue} min=${seatRange.min} max=${seatRange.max} onChange=${onSeatPick} />`
+            ? html`<${SeatCapPicker} value=${seatValue} min=${seatRange.min} max=${seatRange.max} mode=${roomMode} onChange=${onSeatPick} />`
             : null}
           ${roomMode === 'recon' ? html`<${TeamCountPicker} value=${teamCount} onChange=${onTeamPick} />` : null}
           ${queue ? html`<${QuickMatchPanel} queue=${queue} busy=${busy} onCancel=${onCancelQuickMatch} />` : null}
@@ -888,7 +898,7 @@ function AllianceSelect({ onClose, code, onCode, codeOk, recent, online, maint, 
       <section class="ally-side">
         ${hasRoomModPicker(roomMode) ? html`<${ModPicker} selected=${selectedMods} onToggle=${onToggleMod} />` : null}
         ${roomMode === 'coop'
-          ? html`<${SeatCapPicker} value=${seatValue} min=${seatRange.min} max=${seatRange.max} onChange=${onSeatPick} />`
+          ? html`<${SeatCapPicker} value=${seatValue} min=${seatRange.min} max=${seatRange.max} mode=${roomMode} onChange=${onSeatPick} />`
           : null}
         <button type="button" class="ally-card ally-card--create" disabled=${!online || maint?.active || busy === 'create'} onClick=${onCreate}>
           <span class="ally-card__art"><${CreateArt} /></span>
@@ -1078,9 +1088,10 @@ export function LobbyScreen() {
   // (`seatCapPayload`). Keeping the ceiling in state (not a module read at render time) is what makes a reconnect that
   // announces a different ceiling actually re-render the slider.
   const [seatMax, setSeatMax] = useState(() => serverSeatMaxOf());
-  const [seatPick, setSeatPick] = useState(null);
+  const [seatPick, setSeatPick] = useState(() => rememberedCapacity() ?? serverSeatMaxOf());
   const seatRange = seatCapRange(seatMax);
-  const seatValue = seatPick == null ? seatRange.max : clampSeats(seatPick, seatRange.max);
+  const seatValue = clampSeats(seatPick, seatRange.max);
+  const pickSeats = (n) => { setSeatPick(n); if (roomMode === 'coop' && remembersCapacity()) setCapacityRemember(true, n); };
   // 重构模拟（mode 'recon'）的队数：房主在创建屏钉下（缺省 1 队，与服务器 `Room` 的缺省一致），
   // 只随 recon 的 `room.create` 上车（`teamCount`），其它模式的负载一个字节不多。
   const [teamPick, setTeamPick] = useState(RECON.MIN_TEAMS);
@@ -1411,14 +1422,14 @@ export function LobbyScreen() {
       privateRoom=${privateRoom} onPrivate=${setPrivateRoom} online=${online} maint=${maint} busy=${busy} isSearching=${isSearching}
       onCreate=${simulation === 'full' ? createFullSim : create} onQueue=${async () => { await queueMatch(); setSheetOpen(false); }}
       purpose=${sheetPurpose} onSearch=${queueMatch} onCancel=${cancelMatch} mm=${mm} onBrowse=${() => setModalOpen(true)} chained=${sheetChained}
-      seatValue=${seatValue} seatRange=${seatRange} onSeatPick=${setSeatPick}
+      seatValue=${seatValue} seatRange=${seatRange} onSeatPick=${pickSeats}
       teamCount=${teamPick} onTeamPick=${setTeamPick}
       selectedMods=${selectedMods} onToggleMod=${toggleMod}
       queue=${queue} onQuickMatch=${quickMatch} onCancelQuickMatch=${cancelQueue} />` : null}
 
     ${allyOpen ? html`<${AllianceSelect} onClose=${() => setAllyOpen(false)} code=${code} onCode=${(v) => setCode(normalizeCode(v))} codeOk=${codeOk}
       recent=${recent} online=${online} maint=${maint} busy=${busy} difficulty=${difficulty} recruiting=${recruitingRooms(rooms).length}
-      roomMode=${roomMode} seatValue=${seatValue} seatRange=${seatRange} onSeatPick=${setSeatPick}
+      roomMode=${roomMode} seatValue=${seatValue} seatRange=${seatRange} onSeatPick=${pickSeats}
       selectedMods=${selectedMods} onToggleMod=${toggleMod}
       queue=${queue} onQuickMatch=${quickMatch} onCancelQuickMatch=${cancelQueue}
       onCreate=${create} onJoin=${() => join()} onSpectate=${() => spectate()} onBrowse=${() => setModalOpen(true)} onSearch=${openSearch} />` : null}

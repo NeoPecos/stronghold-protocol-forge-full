@@ -50,7 +50,7 @@ export class MatchUnite {
     if (this.clientCombat) { this._startUniteClient(plan); return; }
     this.phase = PHASE.UNITE;
     this.unitePlan = plan;
-    const limit = this.wave ? this.wave.timeLimit : 60;
+    const limit = (this.wave ? this.wave.timeLimit : 60) + (this.uniteTimeBonus || 0);
     const battle = this.newBattle(this._uniteOpts(plan, limit));
     this.fields = [{ fieldId: 'u', kind: 'unite', players: plan.helpers.map((p) => p.playerId), battle, live: true }];
     this.deadline = this.sched.instant ? 0 : this.sched.now() + Math.round((limit / this.gameSpeed) * 1000);
@@ -98,7 +98,7 @@ export class MatchUnite {
     this.unitePlan = combineUniteResults(list, []).plan;
     if (this.clientCombat) { this._startUniteVariantClient(list); return; }
     this.phase = PHASE.UNITE;
-    const limit = this.wave ? this.wave.timeLimit : 60;
+    const limit = (this.wave ? this.wave.timeLimit : 60) + (this.uniteTimeBonus || 0);
     this.fields = list.map((p, i) => {
       const fieldId = this._uniteFieldId(p, i, list.length);
       return { fieldId, kind: 'unite', players: p.helpers.map((x) => x.playerId), battle: this.newBattle(this._uniteOpts(p, limit, fieldId)), live: true };
@@ -287,7 +287,7 @@ export class MatchUnite {
   _startUniteClient(plan) {
     this.phase = PHASE.UNITE;
     this.unitePlan = plan;
-    const limit = this.wave ? this.wave.timeLimit : 60;
+    const limit = (this.wave ? this.wave.timeLimit : 60) + (this.uniteTimeBonus || 0);
     const f = this._ccField({ fieldId: 'u', kind: 'unite', players: plan.helpers.map((p) => p.playerId), opts: this._uniteOpts(plan, limit) });
     this.deadline = this.sched.instant ? 0 : this.sched.now() + Math.round((limit / this.gameSpeed) * 1000);
     this.watchers.clear();

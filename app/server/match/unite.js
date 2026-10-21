@@ -58,7 +58,7 @@ import { planUniteBySquad } from './unite100.mjs';
  */
 export function planUnite(m, results) {
   if (m.isSolo) return null;
-  if (m.variant === true) return planUniteBySquad(m, results);
+  if (m.variant === true && !m.extendedUnite) return planUniteBySquad(m, results);
   const alive = m.alivePlayers();
   const leakers = [];
   const perfects = [];
@@ -70,7 +70,7 @@ export function planUnite(m, results) {
     else if (r.perfect !== false) perfects.push(ps);
   }
   if (!leakers.length || !perfects.length) return null;
-  const helpers = helperOrder(m, perfects, results);
+  const helpers = m.extendedUnite ? extendedHelperOrder(m, perfects, results) : helperOrder(m, perfects, results);
   const leaked = [];
   const notReentered = new Map();
   for (const ps of leakers) {
@@ -243,4 +243,30 @@ export function combineUniteResults(plans, results) {
     plan: { helpers, leakers, leaked, notReentered },
     result: { perPlayer, unspawned, ...(synthetic ? { synthetic: true } : {}) },
   };
+}
+
+/**
+ * 扩展联防 (room rule `extendedUnite`, ported from 0.3.0): up to m.uniteHelpers helpers instead of 2.
+ * `uniteRotation` keeps the 0.3.0 hand-over ordering (players that did not assist in the preceding three rounds
+ * lead); `uniteHumanFirst` puts every human seat ahead of every AI seat.
+ */
+export function extendedHelperOrder(m, perfects, results) {
+  const st = new Map(perfects.map((ps) => [ps.playerId, helperStats(m, ps, results)]));
+  const S = (ps) => st.get(ps.playerId);
+  const human = m.uniteHumanFirst ? (ps) => Number(ps.isBot === true) : () => 0;
+  const take = m.uniteHelpers;
+  if (!m.uniteRotation) {
+    return perfects.slice().sort((a, b) => human(a) - human(b)
+      || S(b).units - S(a).units || Number(S(b).active) - Number(S(a).active)
+      || S(b).layers - S(a).layers || S(b).standing - S(a).standing || a.seat - b.seat).slice(0, take);
+  }
+  const assisted = (ps) => m.uniteAssistedRound?.get(ps.playerId) ?? -Infinity;
+  const recent = (ps) => m.round - assisted(ps) <= 3;
+  return perfects.slice().sort((a, b) => human(a) - human(b)
+    || Number(recent(a)) - Number(recent(b))
+    || (recent(a) ? assisted(a) - assisted(b) : S(b).layers - S(a).layers)
+    || (recent(a) ? S(b).layers - S(a).layers : assisted(a) - assisted(b))
+    || S(b).units - S(a).units || Number(S(b).active) - Number(S(a).active)
+    || S(b).standing - S(a).standing || a.seat - b.seat)
+    .slice(0, take);
 }

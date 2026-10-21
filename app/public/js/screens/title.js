@@ -28,7 +28,7 @@ import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/compo
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { toast } from '../ui/toasts.js';
-import { net, identity } from '../net.js';
+import { net, identity, saveAccountAuth } from '../net.js';
 import { store, useStore, shallowEqual } from '../store.js';
 import { data, useData } from '../data.js';
 import { FullscreenButton, PwaInstallButton, detectFeatures } from '../ui/device.js';
@@ -189,6 +189,48 @@ export function TitleScreen() {
   const cssRidges = assetsSettled && (!ridges || ridgesFailed);
 
   const valid = isValidName(name);
+  // 账号体系（a5 移植，accounts-port/NOTES2.md）：标题页「代号 + 密码」，登录/注册成功后把 30 天票据交给 net.js 的
+  // hello。`/api/account/state` = { enabled }；未开账号的服务器上这段不产生任何账号 DOM（行为与 forge 原生一致）。
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState('login');
+  const [busy, setBusy] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  const [accountOn, setAccountOn] = useState(null); // null = 还在问服务器
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/account/state', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((j) => { if (alive) setAccountOn(j?.enabled === true); })
+      .catch(() => { if (alive) setAccountOn(false); });
+    return () => { alive = false; };
+  }, []);
+  const submitAccount = async () => {
+    if (!valid || busy) return;
+    if (password.length < 8) { setAccountError(t('密码至少 8 位')); return; }
+    setBusy(true); setAccountError('');
+    try {
+      const res = await fetch(`/api/account/${mode}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ name, password }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        const code = json?.error || 'INTERNAL';
+        setAccountError(code === 'BAD_CREDENTIALS' ? t('账号或密码错误')
+          : code === 'NAME_TAKEN' ? t('该代号已被使用')
+          : code === 'WEAK_PASSWORD' ? t('密码需 8–128 位')
+          : code === 'BANNED' ? t('该账号已被封禁')
+          : t('登录失败，请稍后重试'));
+        return;
+      }
+      saveAccountAuth({ ticket: json.ticket, name: json.name || name });
+      if (!enterSession(json.name || name)) setAccountError(t('代号不合法'));
+    } catch {
+      setAccountError(t('无法连接服务器'));
+    } finally {
+      setBusy(false);
+    }
+  };
   const start = () => {
     if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
     enterSession(name);
@@ -254,8 +296,17 @@ export function TitleScreen() {
         </div>` : null}
         <${TextField} label=${t('博士代号')} micro="CALLSIGN" size="lg" icon="user" value=${name} maxLength=${NAME_MAX_LEN}
           placeholder=${t('输入你的代号（最多 {NAME_MAX_LEN} 字）', { NAME_MAX_LEN })} autoFocus=${!touchUi}
-          onInput=${setName} onEnter=${start} />
-        <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>${t('开始')}<//>
+          onInput=${setName} onEnter=${accountOn ? submitAccount : start} />
+        ${accountOn ? html`<${TextField} label=${t('密码')} micro="PASSWORD" type="password" size="lg" icon="key" value=${password}
+            placeholder=${t('输入密码（8 位以上）')} onInput=${setPassword} onEnter=${submitAccount} />
+          <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid || busy || password.length < 8}
+            onClick=${submitAccount}>${mode === 'register' ? t('注册') : t('登录')}<//>
+          <div class="title-account-row">
+            <button type="button" class="title-account-switch tapx" disabled=${busy}
+              onClick=${() => { setAccountError(''); setMode(mode === 'register' ? 'login' : 'register'); }}>
+              ${mode === 'register' ? t('已有账号？登录') : t('没有账号？注册')}</button>
+            ${accountError ? html`<span class="title-account-error">${accountError}</span>` : null}
+          </div>` : html`<${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>${t('开始')}<//>`}
         ${/*
           起名页的**入场位**宿主（`screen.title.entry`，docs/WORKSHOP.md §1.9.3 的第 15 槽）：容器由**组件自己**渲染
           （`[data-mod-slot]`），**不在** `extensions.js MOD_PANEL_CREATED` 的四个浮层里 —— 它不是浮层，是这张起名卡片

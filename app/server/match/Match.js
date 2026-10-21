@@ -418,6 +418,14 @@ export class Match {
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
     /** 「AI 队友最后选择」 (opts.aiPicksLast, GitHub #338): humans draft before AI seats (MatchPhases.humansFirst) */
     this.aiPicksLast = !this.isSolo && opts.aiPicksLast === true;
+    this.extendedUnite = !this.isSolo && opts.extendedUnite === true;
+    this.uniteRotation = this.extendedUnite && opts.uniteRotation === true;
+    this.uniteHumanFirst = this.extendedUnite && opts.uniteHumanFirst === true;
+    const uniteLimit = Math.min(10, Math.max(2, Math.floor(Math.max(1, opts.seats?.length || 1) / 4) * 2));
+    this.uniteHelpers = this.extendedUnite && Number.isInteger(opts.uniteHelpers)
+      && opts.uniteHelpers >= 2 && opts.uniteHelpers % 2 === 0 && opts.uniteHelpers <= uniteLimit
+      ? opts.uniteHelpers : 2;
+    this.uniteTimeBonus = this.extendedUnite ? (uniteLimit - this.uniteHelpers) / 2 * 10 : 0;
     /**
      * 限伤 override for this match's battles (`SP_BOSS_HIT_LIMIT`, shared/constants.js bossHitLimitFrom; opts wins).
      * `undefined` = keep the official `BOSS_HIT_LIMIT` — the default of every existing deployment, in which case the
@@ -725,6 +733,7 @@ export class Match {
     this.watchPref = new Map();
     this.lastResults = new Map();
     this.unitePlan = null;
+    this.uniteAssistedRound = new Map();
     /**
      * 100-seat variant ONLY (design-level item C, docs/PS100-MIGRATION.md §10-C): the per-squad plans of the running
      * 联防 round (`unitePlans`), its round number (`uniteRound`: 1 阶段 1 队内兜底 / 2 阶段 2 跨队兜底) and the
@@ -766,3 +775,7 @@ for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, Match
     Object.defineProperty(Match.prototype, key, Object.getOwnPropertyDescriptor(part.prototype, key));
   }
 }
+
+// phase B：联防协防人数上限 / 时长加成（0.3.0 shared/playerCapacity.js 的同一公式）
+const uniteLimitOf = (players) => Math.min(10, Math.max(2, Math.floor(Math.max(1, players) / 4) * 2));
+const uniteBonusOf = (players, helpers) => (uniteLimitOf(players) - helpers) / 2 * 10;

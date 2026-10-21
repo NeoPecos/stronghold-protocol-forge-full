@@ -530,7 +530,7 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 /* 「轮到你选」 (ui/turnPopup.js): the official effectChoose/* sprites around the middle of the screen, in design px of the
    1920×1080 footage (--px, fitted to the viewport; offsets from the centre). Pops in, holds, fades: 1.2 s. */
 .sptp {
-  --px: min(.01rem, calc(100vw / 1920), calc(100vh / 1080));
+  --px: min(.01rem, calc(100vw / 1920), calc(100dvh / 1080));
   position: fixed; left: 50%; top: 50%; z-index: var(--z-banner); width: 0; height: 0; pointer-events: none;
   animation: sptp-out 1200ms linear both;
 }

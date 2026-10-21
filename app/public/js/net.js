@@ -67,6 +67,25 @@ export function errorText(code, msg) {
 }
 
 /** Error thrown/rejected by requests. `code` is an ERR code or a CLIENT_ERR_TEXT key. */
+// 账号体系（server/http/accountsApi.js）：登录票据存 localStorage，每次 hello 都带上（server/net.js onHelloMsg 校验）
+const K_ACCOUNT_AUTH = 'sp.accountAuth.v1';
+
+/** @returns {{ ticket: string, name?: string } | null} 保存的登录票据 */
+export function loadAccountAuth() {
+  try {
+    const v = JSON.parse(localStorage.getItem(K_ACCOUNT_AUTH) || 'null');
+    return v && typeof v.ticket === 'string' && v.ticket.length > 0 && v.ticket.length <= 4096 ? v : null;
+  } catch { return null; }
+}
+
+/** @param {{ ticket: string, name?: string } | null} value */
+export function saveAccountAuth(value) {
+  try {
+    if (value && typeof value.ticket === 'string') localStorage.setItem(K_ACCOUNT_AUTH, JSON.stringify(value));
+    else localStorage.removeItem(K_ACCOUNT_AUTH);
+  } catch { /* storage off: the tab keeps working until reload */ }
+}
+
 export class NetError extends Error {
   /** @param {string} code @param {string} [msg] server text @param {string} [detail] server developer detail */
   constructor(code, msg, detail) {
@@ -375,6 +394,9 @@ export class Net {
     if (!this.name) return;
     const rid = this._nextRid();
     const msg = { t: 'hello', rid, name: this.name, version: PROTOCOL_VERSION };
+    // a5 账号：有 30 天票据就带上，服务端按票据会话来（没有则走 forge 原生的 auth/password 或纯昵称）。
+    const account = loadAccountAuth();
+    if (account?.ticket) msg.auth = account.ticket;
     let token = null;
     try { token = this.getToken(); } catch { token = null; }
     if (typeof token === 'string' && token.length > 0 && token.length <= 64) {

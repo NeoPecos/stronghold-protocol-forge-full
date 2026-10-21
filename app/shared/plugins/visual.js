@@ -102,7 +102,7 @@ export const LOCK_VERSION = 1;
  * room's effective manifest tens of MB without a byte of art).
  */
 export const VISUAL_LIMITS = Object.freeze({
-  ops: 20000, listFiles: 16, setBytes: 300 * 1024 * 1024, warnings: 32, copyBytes: 2 * 1024 * 1024, setCopyBytes: 4 * 1024 * 1024,
+  ops: 20000, listFiles: 16, setBytes: 400 * 1024 * 1024, warnings: 32, copyBytes: 2 * 1024 * 1024, setCopyBytes: 4 * 1024 * 1024,
 });
 /**
  * [ASSUMED] limits of the clip data plugin.lock.json gives a Spine model (what tools/assets/skel.mjs and anim-roles.mjs

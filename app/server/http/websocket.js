@@ -150,7 +150,9 @@ export function transportPolicy(policies, { log = null } = {}) {
  * @param {{ data: object, log: object }} deps the game data the lobby's matches use, the logger
  * @returns {{ registry: SessionRegistry, lobby: Lobby, network: Network }}
  */
-export function createSessionStack(opts, { data, log, content = null, plugins = null, hosts = null }) {
+import { createFriendsService } from '../friends.js';
+
+export function createSessionStack(opts, { data, log, content = null, plugins = null, hosts = null, accounts = null, accountStore = null, friendsStore = null }) {
   const netOptions = netOptionsFrom(opts);
   const registry = new SessionRegistry({ reconnectWindowMs: netOptions.reconnectWindowMs ?? NET_DEFAULTS.reconnectWindowMs });
   const lobbyOptions = lobbyOptionsFrom(opts);
@@ -172,10 +174,14 @@ export function createSessionStack(opts, { data, log, content = null, plugins = 
     send: (conn, msg) => network.reply(conn, msg),
     log,
   });
+  const friends = opts.friendsStore && opts.accounts
+    ? createFriendsService({ store: opts.friendsStore, accounts: opts.accounts, registry, lobby, log })
+    : null;
   network = new Network({
     registry, handler: lobby, log,
     // 账号（docs/RECORDS.md §2）：null = 没有 SP_ACCOUNTS ⇒ `hello` 里没有认证那一段，握手逐字节不变。
     accounts: opts.accounts || null,
+    friends,
     options: modDispatch ? { ...netOptions, preDispatch: modDispatch.preDispatch, onConnection: modDispatch.onConnection } : netOptions,
   });
   return { registry, lobby, network };
@@ -217,7 +223,7 @@ function meterSocket(ws, req, traffic) {
  *   那个假 Network）。
  * @returns {WebSocketServer}
  */
-export function attachWebSocket(server, { network, log, lanes, perMessageDeflate = undefined, traffic = null }) {
+export function attachWebSocket(server, { network, log, lanes, perMessageDeflate = undefined, traffic = null, maintenance = null }) {
   // 未指定 = 引擎缺省（WS_DEFLATE）；显式 false = 关（包声明 deflate:false / 调用方要求）。
   // SP_WS_COMPRESSION=on 时以我们有界压缩（server/wsCompression.js）为准；'off'（缺省）时不动这一格 ——
   // 于是没设这个环境变量时，这一格与上游 0.2.6 逐字相同。
@@ -245,6 +251,7 @@ export function attachWebSocket(server, { network, log, lanes, perMessageDeflate
     if (!parts) { reject(404, 'Not Found'); return; }
     const lane = parts.rawPath === '/ws' ? null : resolveLane(parts.rawPath, table.lanes);
     if (!lane && parts.rawPath !== '/ws') { reject(404, 'Not Found'); return; }
+    if (parts.rawPath === '/ws' && maintenance?.() === true) { reject(503, 'Service Unavailable'); return; }
     const refused = network.admission(req);
     if (refused === 'per-address') { reject(429, 'Too Many Requests'); return; }
     if (refused) { reject(503, 'Service Unavailable'); return; }

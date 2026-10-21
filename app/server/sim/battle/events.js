@@ -81,6 +81,13 @@ export class BattleEvents {
       for (const p of this.players) snap.dps[p.playerId] = Math.floor(p.dp);
     }
     if (this.sharedBoss) snap.boss = { hp: Math.max(0, Math.round(this.sharedBoss.hp)), max: Math.round(this.sharedBoss.maxHp) };
+    if (Array.isArray(this.pluginUiRows)) {
+      const rows = this.pluginUiRows.slice(0, 32).filter((row) => Array.isArray(row) && row.length === 6
+        && typeof row[0] === 'string' && row[0].length <= 32
+        && typeof row[1] === 'string' && row[1].length <= 64
+        && row.slice(2).every((value) => typeof value === 'number' && Number.isFinite(value)));
+      if (rows.length) snap.pluginUi = rows.map((row) => [...row]);
+    }
     const r2 = (v) => Math.round(v * 100) / 100;
     let down = null;
     for (const u of this.allyUnits) {

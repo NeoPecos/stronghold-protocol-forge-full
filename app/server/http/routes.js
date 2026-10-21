@@ -266,7 +266,7 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   trustProxy: whose forwarding headers name the client (net.js clientAddress; the server's TRUST_PROXY)
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, records = null, accounts = null, modsCatalog, modsPanels, httpLanes, publicDir, trustProxy = 'auto', largeAssets = null, assetPack = null, workshopConflicts = null, workshopAssets = null, workshopPackNames = null, studio = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, records = null, accounts = null, admin = null, modsCatalog, modsPanels, httpLanes, publicDir, trustProxy = 'auto', largeAssets = null, assetPack = null, workshopConflicts = null, workshopAssets = null, workshopPackNames = null, studio = null, csp = null, trustedRuntime = null }) {
   /** @type {Map<string, TokenBucket>} 客户端地址 → 只读战绩路由的桶（见文件头那条「已知边界」） */
   const recordBuckets = new Map();
   /** @type {{ at: number, tracks: any[] } | null} 音乐库的短缓存（见 MUSIC_LIBRARY_URL） */
@@ -305,6 +305,12 @@ export function createRequestHandler({ serveStatic, health, log, records = null,
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
     const parts = splitUrl(url);
     if (!parts) { sendError(req, res, 400, '请求地址无效 · Bad request'); return; }
+    // 账号 API（a5 移植，server/http/accountsApi.js）：登录/注册/票据/状态在静态、信任插件与 lane 之前接住。
+    // 它不是 lane：这条引擎分支先于 lane 解析；但 /api/account 不在 routeMount.js 的
+    // RESERVED_ROUTE_PREFIXES 里，包声明同前缀不会被拒、只会被这里抢先（见 NOTES2.md 风险 9）。
+    const accountApi = accounts?.tickets || null;
+    if (accountApi && accountApi.handles(parts.rawPath)) { await accountApi.handle(req, res); return; }
+    if (admin && admin.handles(parts.rawPath)) { await admin.handle(req, res, parts.rawPath); return; }
     // 受信任插件的精确路径（server/plugins/trustedApi.js，上游 §34.13）：只接 /x/<id>/…，不传活请求/套接字
     if (trustedRuntime && parts.rawPath.startsWith('/x/') && await trustedRuntime.route(req, res, parts.rawPath)) return;
     // 插件工作台（server/studio/index.js）：只给本机与局域网；其他客户端走 404 页
