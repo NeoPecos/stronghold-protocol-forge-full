@@ -367,14 +367,13 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
       <span class="shopbar__remain">${t('剩余可放置角色：')}<b class=${cx('num', remaining === 0 && 't-orange')}>${remaining}</b></span>
       <button type="button" class=${cx('toolbtn', 'toolbtn--ice', frozen && 'is-on')} disabled=${!!frzReason} onClick=${onFreeze}
         title=${frzReason || (frozen ? t('解冻商店 · {key}', { key: hk.freeze }) : t('冻结商店（下回合保留） · {key}', { key: hk.freeze }))}>
-        <${Img} src=${uiUrl(data.get('assets'), frozen ? 'shopPanel/frozen_icon2' : 'shopPanel/frozen_icon')} class="toolbtn__img" fallback=${html`<${Icon} name="snow" />`} />
-        <span>${frozen ? t('解冻') : t('冻结')}</span><kbd>${hk.freeze}</kbd>
+        <span class="toolbtn__iconbox"><${Img} src=${uiUrl(data.get('assets'), frzReason ? 'shopPanel/frozen_icon_lock' : frozen ? 'shopPanel/frozen_icon2' : 'shopPanel/frozen_icon')} class="toolbtn__img" fallback=${html`<${Icon} name="snow" />`} /></span>
+        <span>${frozen ? t('解冻') : t('冻结')}</span>
       </button>
       <button type="button" class="toolbtn toolbtn--amber" disabled=${!!refReason || refreshBusy} onClick=${onRefresh} title=${refReason || (refreshBusy ? t('正在刷新…') : t('刷新商店 · {key}', { key: hk.refresh }))}>
-        <${Img} src=${uiUrl(data.get('assets'), 'shopPanel/refresh_icon')} class="toolbtn__img" fallback=${html`<${Icon} name="refresh" />`} />
+        <span class="toolbtn__iconbox"><${Img} src=${uiUrl(data.get('assets'), refReason ? 'shopPanel/refresh_icon_lock' : 'shopPanel/refresh_icon')} class="toolbtn__img" fallback=${html`<${Icon} name="refresh" />`} /></span>
         <span>${t('刷新')}</span>
-        ${free > 0 ? html`<span class="toolbtn__free">${t('免费 ×{free}', { free })}</span>` : html`<${HexBadge} value=${shop.refreshPrice ?? 1} tone=${refReason || refreshBusy ? 'dark' : 'gold'} size="sm" />`}
-        <kbd>${hk.refresh}</kbd>
+        ${free > 0 ? html`<span class="toolbtn__free" aria-label=${t('免费 ×{free}', { free })}>×${free}</span>` : html`<${HexBadge} value=${shop.refreshPrice ?? 1} tone=${refReason || refreshBusy ? 'dark' : 'gold'} size="sm" />`}
       </button>
     </div>
     <div class="shopbar__row">
@@ -400,13 +399,12 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
           })
           : html`<${SoldCard} item=${true} />`}
       </div>`}
-      <div class="funds">
+      <div class="funds" title=${t('目前资金')}>
+        <img class="funds__shopkeeper" src="/ui-custom/shopkeeper.png" alt="" />
         <div class="funds__hex">
-          <${CoinGlyph} class="funds__coin" />
           <b class="funds__num num">${funds}</b>
         </div>
-        <span class="funds__label">${t('目前资金')}</span>
-        <button type="button" class="funds__collapse" onClick=${() => onCollapse(true)}><${Icon} name="close" />${t('收起')}</button>
+        <button type="button" class="funds__collapse" onClick=${() => onCollapse(true)}>${t('收起')}<span class="funds__collapse-icon" aria-hidden="true"></span></button>
       </div>
     </div>
   </section>`;

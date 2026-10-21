@@ -2745,5 +2745,17 @@
   "移出列表": "Remove from playlist",
   "列表为空：在「服务器音乐」里选一首，它会加入轮播并立即播放。": "The playlist is empty: pick one under \"Server music\" and it will be added and played.",
   "记住本次选择": "Remember this choice",
-  "下次开房沿用本次人数": "Reuse this seat count next time"
+  "下次开房沿用本次人数": "Reuse this seat count next time",
+  "同盟聊天": "Room chat",
+  "同盟通讯": "Alliance chat",
+  "折叠聊天": "Collapse chat",
+  "聊天消息": "Chat message",
+  "输入消息…": "Type a message…",
+  "弹幕开": "Messages on",
+  "弹幕关": "Messages off",
+  "等待连接恢复…": "Waiting for reconnection…",
+  "发送失败，请重试": "Could not send. Try again.",
+  "同盟通讯已连接": "Alliance chat connected",
+  "展开或折叠聊天": "Open or collapse chat",
+  "聊": "Chat"
 }

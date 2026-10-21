@@ -1,0 +1,4 @@
+/* Forge-only in-match controls kept alongside the main server's visual layer. */
+.team { max-height: calc(100dvh - 3.9rem); }
+.team__list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.gtop__clock .speedbtn { flex: none; }

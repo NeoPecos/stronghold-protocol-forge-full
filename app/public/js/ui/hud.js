@@ -505,8 +505,6 @@ export const TopBar = modComponent('game.hud.topBar', function TopBar({ pub, pri
   const cap = Number(config?.lpCapPerRound) > 0 ? Number(config.lpCapPerRound) : 10;
   const frozenSecs = Number.isFinite(frozenAt) ? remainAt(pub?.deadline, frozenAt) : null;
   const btn = checkButtons({ pen, penAvail, infoOpen: !!drawer });
-  const fx = useCapsuleFx(phase, pub?.round);
-  useEffect(() => { preloadCapsuleArt(); }, []);
   const onLeft = () => (pen ? onPen(false) : onDrawer('info'));
   const onRight = () => (pen ? onPen(false) : penAvail ? onPen(true) : null);
   return html`<header class=${cx('gtop', pen && 'is-pen')}>
@@ -525,25 +523,28 @@ export const TopBar = modComponent('game.hud.topBar', function TopBar({ pub, pri
       </div>
     </div>
 
-    <div class="gtop__center brackets">
-      <${Tooltip} text=${btn.left.tip} placement="bottom">
-        <${CheckBtn} sprite=${btn.left.sprite} cls=${cx('gtop__iconbtn', btn.left.back && 'is-back')} label=${btn.left.label}
-          chev=${btn.left.back ? '◀◀' : null} on=${!!drawer && !pen} onClick=${onLeft} testid="check-player" />
-      <//>
-      <div class="roundbox">
-        <span class="roundbox__label">${t('回合')}</span>
-        <b class="roundbox__num num">${roundText}</b>
+    <div class=${cx('gtop__center', boss && 'gtop__center--boss')}>
+      <div class="gtop__check brackets">
+        <${Tooltip} text=${btn.left.tip} placement="bottom">
+          <${CheckBtn} sprite=${btn.left.sprite} cls=${cx('gtop__iconbtn', btn.left.back && 'is-back')} label=${btn.left.label}
+            chev=${btn.left.back ? '◀◀' : null} on=${!!drawer && !pen} onClick=${onLeft} testid="check-player" />
+        <//>
       </div>
-      <div class=${cx('gtop__cap', fx.kind && `is-fx-${fx.kind}`)} key=${`cap${fx.seq}`}>
+      <div class="gtop__meter">
+        <div class="roundbox">
+          <span class="roundbox__label">${t('回合')}</span>
+          <b class="roundbox__num num">${roundText}</b>
+        </div>
         <${PhaseCapsule} pub=${pub} hud=${hud} miss=${!boss && Number.isFinite(live?.left) ? live.left : null} />
-        ${fx.kind && fx.kind !== 'enter' ? html`<${CapsuleScene} kind=${fx.kind} />` : null}
+        <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending}
+          note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
       </div>
-      <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending}
-        note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
-      <${Tooltip} text=${btn.right.tip} placement="bottom">
-        <${CheckBtn} sprite=${btn.right.sprite} cls=${cx('enemybtn', btn.right.grey && 'is-grey')} label=${btn.right.label}
-          chev=${btn.right.grey ? null : '▶▶'} disabled=${btn.right.grey && !pen} onClick=${onRight} testid="check-enemy" />
-      <//>
+      <div class="gtop__check brackets">
+        <${Tooltip} text=${btn.right.tip} placement="bottom">
+          <${CheckBtn} sprite=${btn.right.sprite} cls=${cx('enemybtn', btn.right.grey && 'is-grey')} label=${btn.right.label}
+            chev=${btn.right.grey ? null : '▶▶'} disabled=${btn.right.grey && !pen} onClick=${onRight} testid="check-enemy" />
+        <//>
+      </div>
     </div>
 
     <div class="gtop__right">
@@ -564,7 +565,8 @@ export const TopBar = modComponent('game.hud.topBar', function TopBar({ pub, pri
 export function DpCounter({ dp }) {
   if (!Number.isFinite(dp)) return null;
   return html`<div class="dpbox" title=${t('部署费用（再部署消耗）')}>
-    <${GIcon} name="dp" class="dpbox__icon" /><b class="num">${Math.floor(dp)}</b><${MicroLabel}>COST</${MicroLabel}>
+    <img class="dpbox__icon" src="/ui-custom/deploy-cost.svg" alt="" />
+    <b class="num">${Math.floor(dp)}</b>
   </div>`;
 }
 

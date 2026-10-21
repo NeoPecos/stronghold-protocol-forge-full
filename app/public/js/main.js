@@ -55,6 +55,7 @@ import { data } from './data.js';
 // （一行日志，不抛）—— 与 `net` / `settings` 两条注入面同一个形状。
 import { battleRunner } from './battle/runner.js';
 import { GAME_FILES } from './ui/gameComponents.js';
+import { mountMatchChat } from './ui/matchChat.js';
 import { roomDataBase } from './mods/align.js';
 import { TitleScreen, sanitizeName } from './screens/title.js';
 import { LobbyScreen, rememberRoom } from './screens/lobby.js';
@@ -769,6 +770,7 @@ async function boot() {
   // the language (and its UI translations) before the first render: no Chinese flash for an English player
   const langReady = initLang().catch((err) => console.warn('[app] language setup failed', err));
   await Promise.all([waitForFonts(1200), connectWhenReady, langReady, modDeclReady]);
+  mountMatchChat();
   const root = document.getElementById('app');
   render(html`<${App} />`, root);
   appRoot = root; // 组件级改写（§28.19）注册完成之后要重画的正是这一个根
