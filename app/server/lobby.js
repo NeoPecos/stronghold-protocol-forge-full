@@ -1206,7 +1206,7 @@ export class Lobby {  /**
       case 'room.mods':
         return fail(ERR.MOD_SET_LOCKED, 'this server runs a fixed mod set; rooms cannot change it');
       case 'room.feverMusic': return this.setFeverMusic(session, msg);
-      case 'room.addBot': return this.addBot(session);
+      case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.start': return this.start(session);
@@ -1670,6 +1670,8 @@ export class Lobby {  /**
     if (old) room.seats[old.seat] = null;
     if (spectator) room.spectators = room.spectators.filter((s) => s.playerId !== session.playerId);
     room.seats[idx] = this.humanSeat(idx, session);
+    if (old?.team != null) room.seats[idx].team = old.team;
+    normalizeReconTeams(room);
     if (!room.hostId) room.hostId = session.playerId;
     session.roomCode = room.code;
     this.broadcastState(room);
@@ -2352,8 +2354,15 @@ export class Lobby {  /**
     if (room.mode === 'recon' && room.seats.filter((s) => s && !s.left).length >= reconTeamCapacity(room)) {
       return fail(ERR.ROOM_FULL, 'all teams are full');
     }
-    const idx = room.freeSeat();
-    if (idx < 0) return fail(ERR.ROOM_FULL);
+    const idx = seat === undefined ? room.freeSeat() : seat;
+    if (idx < 0 && seat === undefined) return fail(ERR.ROOM_FULL);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= room.seats.length) return fail(ERR.BAD_TARGET);
+    if (room.seats[idx]) return fail(ERR.ROOM_FULL, 'seat taken');
+    if (room.mode !== 'recon') {
+      const humanCount = room.seats.filter((s) => s && !s.isBot && !s.left).length;
+      const botCount = room.seats.filter((s) => s && s.isBot).length;
+      if (botCount >= humanCount * 3) return fail(ERR.BAD_TARGET, 'AI teammates are capped by the number of humans in the room');
+    }
     const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
     const name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
     let playerId;

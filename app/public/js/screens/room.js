@@ -288,7 +288,7 @@ function SeatCapSetter({ room, isHost, onPick }) {
   </div>`;
 }
 
-function SeatCard({ seat, index, room, facts, myId, busy, onKick, onInvite, searching, portraits, onPickCard = null, onAddBot = null, onRemoveBot = null }) {
+function SeatCard({ seat, index, room, facts, myId, busy, onKick, onSeat, searching, portraits, onPickCard = null, onAddBot = null, onRemoveBot = null }) {
   const seatAccount = useAccount(seat && !seat.isBot ? seat.playerId : null);
   // 自己那一席的头像：引擎的「账号目录」（`useAccount`）在本仓库是空壳（恒 `null`），所以**本机自己那一枚**走
   // `me.avatar`（`ctx.session.setAvatar` 落的那一格，`ui/accounts.js` 的芯片同源）；**别人那一席**走引擎按座位记下的
@@ -298,21 +298,24 @@ function SeatCard({ seat, index, room, facts, myId, busy, onKick, onInvite, sear
   const [bad, setBad] = useState(null);
   const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId));
   if (!seat) {
-    const invitable = room.mode !== 'solo' && !facts.spectating;
+    const canTakeSeat = room.mode !== 'solo' && !room.inMatch && !searching;
+    const humansNow = facts.seats.filter((s) => s && !s.isBot && !s.left).length;
+    const botsNow = facts.seats.filter((s) => s && s.isBot).length;
+    const canAddBot = room.mode === 'recon' || botsNow < humansNow * 3;
     return html`<article class=${`rseat rseat--empty${searching ? ' is-searching' : ''}`} style=${`--i:${index}`}>
       <span class="rseat__clip" aria-hidden="true"></span>
       <header class="rseat__strip"><i></i><span class="num">P${index + 1}</span></header>
       <div class="rseat__art">
         ${searching
           ? html`<span class="rseat__wait"><svg viewBox="0 0 40 48" aria-hidden="true"><path d="M20 2l5 5-5 5-5-5z" /><rect x="10" y="16" width="14" height="22" rx="3" /><path d="M24 22h10l-4 7 4 7H24" /></svg><small>STRONGHOLD PROTOCOL</small></span>`
-          : invitable
-            ? html`<button type="button" class="rseat__invite" onClick=${onInvite} title=${t('复制同盟密钥以邀请队友')}>
-                <span class="rseat__plus" aria-hidden="true"></span><b>${t('邀请')}</b><small>${t('复制同盟密钥以邀请队友')}</small></button>`
+          : canTakeSeat
+            ? html`<button type="button" class="rseat__invite" disabled=${busy === 'seat'} onClick=${() => onSeat(index)} title=${t('点击换到这个位置')}>
+                <span class="rseat__plus" aria-hidden="true"></span><b>${t('入座')}</b><small>${t('点击换到这个位置')}</small></button>`
             : html`<span class="rseat__wait"><small>${t('等待博士加入')}</small></span>`}
         <span class="rseat__noinfo" aria-hidden="true">NOINFO</span>
       </div>
-      ${invitable && facts.isHost && onAddBot ? html`<button type="button" class="rseat__kick rseat__kick--bot" disabled=${busy === `add${index}`}
-        onClick=${onAddBot} title=${t('添加 AI 队友')} aria-label=${t('添加 AI 队友')}><${Icon} name="robot" /><${Icon} name="plus" /></button>` : null}
+      ${canTakeSeat && facts.isHost && onAddBot && canAddBot ? html`<button type="button" class="rseat__addbot" disabled=${busy === `add${index}`}
+        onClick=${() => onAddBot(index)} title=${t('在此位置添加 AI 队友')} aria-label=${t('添加 AI 队友')}><${Icon} name="robot" /><span>${t('添加 AI')}</span></button>` : null}
       <div class="rseat__plate rseat__plate--empty" aria-hidden="true"></div>
     </article>`;
   }
@@ -879,9 +882,9 @@ export function RoomScreen() {
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  // 「添加 AI 队友」：包版房间把空席位的入口只留了「邀请」，而服务端 `room.addBot` / `room.removeBot` 一直都在
-  // （HEAD 的引擎房间有这两个按钮，见本次 CHANGELOG 0.18.4）。按业主裁定补回**入口**，协议与服务端一字未动。
-  const addBot = () => run('add', () => net.request('room.addBot', {}));
+  // The button beneath each empty card sends its exact seat; the seat card itself moves the player there.
+  const addBot = (seat) => run(`add${seat}`, () => net.request('room.addBot', { seat }));
+  const takeSeat = (seat) => run('seat', () => net.request('room.takeSeat', { seat }));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
   const setDifficulty = (difficulty) => run('diff', async () => { await net.request('room.setDifficulty', { difficulty }); setPicker(false); });
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
@@ -982,10 +985,19 @@ export function RoomScreen() {
     </header>
 
     ${room.mode === 'recon' ? html`<${TeamBar} room=${room} facts=${facts} busy=${busy} onPick=${pickTeam} />` : null}
-    <main class="rs-seats">
-      ${facts.seats.map((s, i) => html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
-        myId=${me.playerId} busy=${busy} onKick=${kick} onInvite=${() => copy('code')} searching=${searching} portraits=${portraits}
-        onPickCard=${cardList.length ? () => setPicking(true) : null} onAddBot=${addBot} onRemoveBot=${removeBot} />`)}
+    <main class="rs-seats rs-seats--grouped">
+      ${Array.from({ length: Math.ceil(facts.seats.length / 4) }, (_, group) => html`
+        <section class="rs-group" key=${`g${group}`}>
+          <header class="rs-group__head"><span>${t('第 {n} 组', { n: group + 1 })}</span><small>${t('4 人一组 · 点空位入座')}</small></header>
+          <div class="rs-group__seats">
+            ${facts.seats.slice(group * 4, group * 4 + 4).map((s, offset) => {
+              const index = group * 4 + offset;
+              return html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${index}`} seat=${s} index=${index} room=${room} facts=${facts}
+                myId=${me.playerId} busy=${busy} onKick=${kick} onSeat=${takeSeat} searching=${searching} portraits=${portraits}
+                onPickCard=${cardList.length ? () => setPicking(true) : null} onAddBot=${addBot} onRemoveBot=${removeBot} />`;
+            })}
+          </div>
+        </section>`)}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
         <h2>${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num t-dim"> ${info.code}</span></h2>

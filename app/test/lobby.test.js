@@ -951,9 +951,29 @@ describe('websocket lobby', () => {
     const s4 = await host.waitFor('room.state', (s) => s.seats[1]?.isBot);
     assert.equal(s4.seats[1].name, BOT_NAMES[0], 'freed bot name is reused');
 
+    await expectOk(host, { t: 'room.addBot', seat: 3 });
+    const placed = await host.waitFor('room.state', (s) => s.seats[3]?.isBot);
+    assert.equal(placed.seats[3].seat, 3, 'the AI button fills the chosen empty card');
+    await expectError(host, { t: 'room.addBot', seat: 2 }, ERR.ROOM_FULL);
+    await expectOk(host, { t: 'room.removeBot', seat: 3 });
+    await host.waitFor('room.state', (s) => s.seats[3] === null);
+    await expectOk(host, { t: 'room.takeSeat', seat: 3 });
+    const moved = await host.waitFor('room.state', (s) => s.seats[0] === null && s.seats[3]?.playerId === host.id);
+    assert.equal(moved.seats[3].seat, 3, 'clicking an empty card moves the player into that seat');
+
     await expectOk(host, { t: 'room.leave' });
     const probe = await pool.player('Probe');
     await expectError(probe, { t: 'room.join', code: st.code }, ERR.ROOM_NOT_FOUND);
+  });
+
+  test('20-seat co-op keeps the original limit of three AI teammates per human', async () => {
+    const host = await pool.player('Host');
+    await expectOk(host, { t: 'room.create', mode: 'coop', difficulty: 'NORMAL', seatCap: 20 });
+    for (const seat of [3, 7, 19]) await expectOk(host, { t: 'room.addBot', seat });
+    const filled = await host.waitFor('room.state', (s) => s.seats[19]?.isBot);
+    assert.deepEqual([3, 7, 19].map((seat) => filled.seats[seat]?.isBot), [true, true, true]);
+    await expectError(host, { t: 'room.addBot', seat: 18 }, ERR.BAD_TARGET);
+    assert.equal(filled.seats[18], null);
   });
 
   test('start flow: readiness gate → stub INFO_CHECK → end → back to LOBBY → play again', async () => {

@@ -799,6 +799,7 @@ export const C2S = {
   // test: only the literal true (DESIGN §36.8). Omit it for a normal room — `false` is a bad field, so a
   // string cannot sneak in as "not a test". The server still refuses it unless SP_TEST_MODE is on.
   'room.leave': {},
+  'room.takeSeat': { seat: (v) => isInt(v, 0, SEAT_CAP - 1) },
   // 上局战绩（`SP_ACCOUNTS=1`, server/matchRecords.js, docs/RECORDS.md）：空消息，答案走 `records.latest`
   // 给**请求者本人**。开着账号时它是「我这个账号的最近一局」；关着账号时按会话 playerId 查（每次连接的新 id，
   // 所以实际上只会拿到本会话打过的局）。它在 `server/net.js` 的 `HEAVY_TYPES` 里：一次廉价请求换一整份战绩。
@@ -867,7 +868,7 @@ export const C2S = {
         && m.end > m.start && m.end - m.start >= FEVER_MUSIC_MIN_SEGMENT && m.end - m.start <= FEVER_MUSIC_MAX_SEGMENT;
     },
   },
-  'room.addBot': {},
+  'room.addBot': { seat: (v) => isInt(v, 0, SEAT_CAP - 1), $optional: ['seat'] },
   'room.removeBot': { seat: (v) => isInt(v, 0, SEAT_CAP - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused

@@ -267,7 +267,7 @@
 @keyframes card-in { from { opacity: 0; transform: translateY(.14rem); } }
 
 
-/* 20人同盟：大房席位自动折行（每排最多 10 席），转场沿用 rseat 动画 */
+/* Large rooms wrap their seat groups while keeping the existing card animation. */
 .rs--big .rs-seats { flex-wrap: wrap; align-content: center; justify-content: center; row-gap: .18rem; }
 .rs--big .rseat { --w: calc((100% - 9 * .16rem) / 10); }
 
@@ -337,6 +337,7 @@
 .rseat:has(.rseat__addbot) .rseat__plate--empty { display: none; }
 .rseat__addbot {
   position: static;
+  z-index: auto;
   transform: none;
   display: flex;
   width: 100%;
@@ -2485,10 +2486,7 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .seat-cap--room .seat-cap__name { font-size: calc(.14 * var(--t)); color: var(--text-lo); }
 .seat-cap--room .seat-cap__slider { width: 1.1rem; margin: 0; }
 .seat-cap--room .seat-cap__value { margin-left: 0; font-size: calc(.16 * var(--t)); }
-/* ---- 添加 / 移除 AI 队友（业主裁定：既有功能不能因换 UI 而消失） ------------------------------------------
-   包版房间的空席位只有「邀请」，而服务端 room.addBot / room.removeBot 一直都在（引擎房间有这两个按钮）。
-   这里补回**入口**，用的是包版自己的角落按钮形状（.rseat__kick，绝对定位、不占布局 ⇒ 席位卡尺寸与排布
-   一个像素都不动），只把颜色从「危险红」换成薄荷绿，好和「移出真人」区分开。协议与服务端一字未动。 */
+/* Bot removal remains on the occupied card; bot creation uses the full-width button below an empty card. */
 .rseat__kick--bot { color: #7fe8c8; background: #10312a; border-color: rgba(79, 232, 192, .6); }
 .rseat__kick--bot:hover:not(:disabled) { filter: brightness(1.25); }
 .seat-cap__choices { display: flex; flex-wrap: wrap; gap: .06rem; margin: .08rem 0; }
