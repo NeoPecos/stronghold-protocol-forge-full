@@ -1172,8 +1172,8 @@ describe('screen helpers', () => {
     // ① 判据只有一份实现：`checking` 与 `needed/ok` 的那条表达式住在 isAlignBlocked 里，两个门都读它
     assert.match(source, /export function isAlignBlocked\(align\) \{[\s\S]{0,140}?align\.checking \|\| \(align\.needed && !align\.ok\)/,
       '对齐判据本体只有这一处');
-    assert.match(source, /const alignBlocked = isAlignBlocked\(align\);/, '非房主那一格读它');
-    assert.match(source, /const soloAlignBlocked = hostStartAlignBlocked\(\{ solo: !coop, align \}\);/, 'solo 那一格也读它');
+    assert.match(source, /const alignBlocked = roomAlignBlocked\(room, align\);/, '非房主那一格按房间来源判断');
+    assert.match(source, /const soloAlignBlocked = hostStartAlignBlocked\(\{ solo: !coop, room, align \}\);/, 'solo 那一格也读房间来源');
     // ② 结构：开始模拟那个按钮真的把 solo 那一格算进 disabled（改前这一条红 —— 明知缺件也能开局）
     assert.match(source, /disabled=\$\{!facts\.canStart \|\| !online \|\| busy === 'start' \|\| soloAlignBlocked\}/,
       'solo 房主缺件时开始按钮被挡（改前红）');

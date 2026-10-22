@@ -136,9 +136,10 @@ export function roomFacts(room, myId) {
   const modded = isModdedRoom(room);
   const contentReady = !modded || humans.every((s) => s.content === 'ready');
   return {
-    seats, occupied, humans, mine, isHost, readyHumans, isReady,
+    seats, occupied, humans, mine, isHost, readyHumans, isReady, modded, contentReady,
+    myContent: modded ? mine?.content || 'loading' : 'ready',
     emptySeats: seats.filter((s) => !s).length,
-    canStart: isHost && othersReady && !!mine,
+    canStart: isHost && othersReady && !!mine && contentReady,
     othersReady,
     // spectator seats (never players: not in `humans`, never counted for ready / start)
     spectators: Array.isArray(room?.spectators) ? room.spectators.filter((s) => s && typeof s === 'object') : [],
@@ -546,6 +547,13 @@ export function isAlignBlocked(align) {
   return !!(align && (align.checking || (align.needed && !align.ok)));
 }
 
+// a5 DLC rooms serve their own checked content from this server. Local OPFS
+// workshop copies are not part of that contract; the hidden legacy alignment
+// panel must not keep either the host or a guest from starting.
+export function roomAlignBlocked(room, align) {
+  return !room?.dlc && isAlignBlocked(align);
+}
+
 /**
  * 房主的**开始模拟**要不要被对齐挡住（⑥）。**只作用于 solo**。
  *
@@ -558,8 +566,8 @@ export function isAlignBlocked(align) {
  * @param {{ solo?: boolean, align: { ok: boolean, needed: boolean, missing: number, checking?: boolean }|null }} o
  * @returns {boolean}
  */
-export function hostStartAlignBlocked({ solo, align }) {
-  return solo === true && isAlignBlocked(align);
+export function hostStartAlignBlocked({ solo, room = null, align }) {
+  return solo === true && roomAlignBlocked(room, align);
 }
 
 /**
@@ -576,6 +584,7 @@ export function hostStartAlignBlocked({ solo, align }) {
  */
 function RoomModsPanel({ room, myId = null, onAlignment = null, hidden = false }) {
   const mods = roomModsOf(room);
+  const serverManaged = !!room?.dlc;
   // 服务端声明过哪些包（`welcome.mods.packs`，main.js 写进 store.roomMods）：房主在房间里能挑的就是这一份的子集。
   const available = roomMods.availableMods();
   // 本服务器内容固定：房间不提供改集合入口（服务端同样拒绝 room.mods）。
@@ -595,6 +604,7 @@ function RoomModsPanel({ room, myId = null, onAlignment = null, hidden = false }
   // Ask once per room set: the answer decides both what this panel shows and whether Ready is offered. A room without a
   // declaration reports 「无需对齐」 and the panel disappears.
   useEffect(() => {
+    if (serverManaged) { setPlan(null); setChecked(true); report(null); return undefined; }
     if (!digest) { setPlan(null); setChecked(true); report(null); return undefined; }
     let live = true;
     setChecked(false);
@@ -612,7 +622,7 @@ function RoomModsPanel({ room, myId = null, onAlignment = null, hidden = false }
     })().catch(() => { if (live) { setChecked(true); setPlan(null); report(null); } });
     return () => { live = false; };
     // `digest` is the identity of the set: the same packs re-announced must not re-download or re-hash
-  }, [digest]);
+  }, [digest, serverManaged]);
 
   // 干净安装（服务器没声明任何包）⇒ 一个字节都不多；没声明集合**且改不了** ⇒ 与从前逐字节相同。
   if (!mods && !editable) return null;
@@ -825,9 +835,9 @@ export function RoomScreen() {
   const myReady = !!facts.mine?.ready;
   // 对齐硬门（W-D，加上 G2 的 `checking`）：集合一变，`RoomModsPanel` 先把状态报成「正在核对」——在那之前，
   // 上一份摘要的结论**不是关于这一份集合的**，所以这一段也挡住准备就绪（否则会有一次「拿旧结论点下去」的窗口）。
-  const alignBlocked = isAlignBlocked(align);
+  const alignBlocked = roomAlignBlocked(room, align);
   // ⑥：同一道门也作用于 solo 房主的「开始模拟」（只作用于 solo —— 非 solo 一个字不改，见 `hostStartAlignBlocked`）。
-  const soloAlignBlocked = hostStartAlignBlocked({ solo: !coop, align });
+  const soloAlignBlocked = hostStartAlignBlocked({ solo: !coop, room, align });
   const info = difficultyInfo(room.mode, room.difficulty, { random: firepower, variant });
   const variantName = variant === 'endurance' ? t('持久鏖战') : variant === 'marathon' ? t('最长时赛') : t('快速突袭');
   const modeName = firepower ? `${RANDOM_MODE_NAME} · ${variantName}` : room.mode === 'recon' ? t('重构模拟') : coop ? t('同盟模拟') : t('独立模拟');
@@ -941,7 +951,9 @@ export function RoomScreen() {
     : facts.spectating
       ? html`<span class="t-lo"><${Icon} name="eye" />${t('观战中 · 不占博士席位，模拟开始后可切换观看各位博士')}</span>`
     : !coop
-      ? html`<span class="t-mint">${t('*模拟协议已就绪，准许进入模拟')}</span>`
+      ? facts.contentReady
+        ? html`<span class="t-mint">${t('*模拟协议已就绪，准许进入模拟')}</span>`
+        : html`<span class="t-lo">${t('仍有博士未载入房间的插件内容')}</span>`
     : facts.isHost
       ? facts.canStart
         ? facts.emptySeats && searchable
@@ -992,7 +1004,7 @@ export function RoomScreen() {
     <main class="rs-seats rs-seats--grouped">
       ${Array.from({ length: Math.ceil(facts.seats.length / 4) }, (_, group) => html`
         <section class="rs-group" key=${`g${group}`}>
-          <header class="rs-group__head"><span>${t('第 {n} 组', { n: group + 1 })}</span><small>${t('4 人一组 · 点空位入座')}</small></header>
+          ${coop ? html`<header class="rs-group__head"><span>${t('第 {n} 组', { n: group + 1 })}</span><small>${t('4 人一组 · 点空位入座')}</small></header>` : null}
           <div class="rs-group__seats">
             ${facts.seats.slice(group * 4, group * 4 + 4).map((s, offset) => {
               const index = group * 4 + offset;
