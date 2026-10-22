@@ -805,7 +805,8 @@ export const C2S = {
   // 所以实际上只会拿到本会话打过的局）。它在 `server/net.js` 的 `HEAVY_TYPES` 里：一次廉价请求换一整份战绩。
   'records.mine': {},
   'friend.list': {},
-  'friend.request': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
+  'friend.request': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24,
+    playerId: (v) => typeof v === 'string' && v.length > 0 && v.length <= 128, $optional: ['playerId'] },
   'friend.accept': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
   'friend.decline': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },
   'friend.remove': { name: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 24 },

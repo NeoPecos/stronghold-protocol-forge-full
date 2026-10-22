@@ -54,6 +54,7 @@ import {
 import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy, assetIndexOptionsFrom } from './http/config.js';
 import { WS_MAX_PAYLOAD, createSessionStack, attachWebSocket, transportPolicy } from './http/websocket.js';
 import { DATA_SHIM_JS, createStaticHandler } from './http/static.js';
+import { buildDlcPreview } from './dlcPreview.js';
 import { createPackRegistry } from './packs.js';
 // 0.3.0（上游 DESIGN §34）的插件面：包注册表并进插件注册表（`server/packs.js` 现在只是它的别名再导出），
 // 加原生内容集、视觉集、仅服务端生效的插件策略 / 房间集合、以及「一局一进程」的对局宿主与可信脚本运行器。
@@ -319,9 +320,10 @@ export async function startServer(opts = {}) {
   const workshopBattleFiles = workshopBattleFilesFor(battleModules, workshopDir);
   // 按房间物化（W-B，DESIGN §28.9）：房间声明的集合要真的决定这一局跑什么。只在**装了包**时建它 ——
   // 干净安装既不需要官方那一份的第二次读取，也没有任何集合会比「进程级那一份」更小。
-  const roomAssets = (workshopLoaded.packs || []).length
+  const officialData = (workshopLoaded.packs || []).length ? loadData(dataDir, { log, workshopDir: null }) : null;
+  const roomAssets = officialData
     ? createRoomAssets({
-      official: loadData(dataDir, { log, workshopDir: null }),
+      official: officialData,
       processData: data,
       packs: workshopLoaded.packs,
       kits: workshopKits.kits,
@@ -332,6 +334,7 @@ export async function startServer(opts = {}) {
       log,
     })
     : null;
+  const dlcPreview = officialData ? Buffer.from(JSON.stringify(buildDlcPreview(officialData, workshopLoaded.packs, workshopKits.owners)), 'utf8') : null;
   // `/room-data/<摘要>/<文件>.json` 那一面（同一个物化缓存；没有装包时这一面根本不存在）。
   const roomDataFace = roomAssets ? (digest) => roomAssets.byDigest(digest) : null;
   // 上游 0.3.0 的插件流水线（DESIGN §34.6）：服务端主人的策略（plugins/config.json）·「带玩法插件的内容集」
@@ -449,7 +452,7 @@ export async function startServer(opts = {}) {
   const indexOptions = assetIndexOptionsFrom(opts, publicDir);
   const assetIndex = indexOptions ? createAssetIndex({ publicDir, log, ...indexOptions }) : null;
   const views = assetIndex ? createManifestViews({ dataDir, index: assetIndex, log, override: workshopJson }) : null;
-  const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, workshopJson, workshopKitFiles, workshopKitDirs, workshopPanelFiles, workshopAssets, workshopRoutes, workshopResourceFiles, resourcePolicy, workshopI18n, modsJson, roomData: roomDataFace, workshopBattleFiles, modRoutes, voiceCdn: voiceCdn.overrides, assetIndex, views, visual, contents });
+  const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, workshopJson, workshopKitFiles, workshopKitDirs, workshopPanelFiles, workshopAssets, workshopRoutes, workshopResourceFiles, resourcePolicy, workshopI18n, modsJson, roomData: roomDataFace, dlcPreview, workshopBattleFiles, modRoutes, voiceCdn: voiceCdn.overrides, assetIndex, views, visual, contents });
   // 插件工坊（DESIGN §34.9）：它自己的页面与 API，只对本机与本地网开放（路由层另一道门）。它只在被用到之后才
   // 盯 plugins/（热重载），而「房主是作者或独自一人」的房间自己跟随插件的改动。`studio: false` 关掉它。
   const studio = opts.studio === false ? null : createStudio({ publicDir, pluginsDir, dataDir, registry: packs, lobby, sessions: registry, log, fetch: opts.fetch });

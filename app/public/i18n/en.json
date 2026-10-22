@@ -2814,5 +2814,21 @@
   "故事集盟约类型与禁用抽签规则，并处理专属干员的本局禁用。": "Side Story bond type, ban selection rules, and bans for exclusive operators.",
   "局内盟约徽标、开局简报分区与结算报告分区。": "In-match bond badge, briefing section, and results report section.",
   "攻速、法抗、技力回复、再部署时间等可供故事集盟约使用的公共效果。": "Shared effects for attack speed, resistance, SP recovery, and redeployment time.",
-  "本包自身不新增干员、盟约或策略；多索雷斯需要它作为规则前置。": "This pack adds no operators, bonds, or strategies by itself. Dossoles requires its rules."
+  "本包自身不新增干员、盟约或策略；多索雷斯需要它作为规则前置。": "This pack adds no operators, bonds, or strategies by itself. Dossoles requires its rules.",
+  "DLC 对比": "DLC comparison",
+  "DLC 对比资料暂不可用": "DLC comparison is temporarily unavailable",
+  "此干员没有已安装 DLC 的改动": "No installed DLC changes this operator",
+  "左侧为本体与公共包，右侧为各 DLC 单独加入后的变化。本房实际内容由开关决定。": "The left column is the base game plus common packs. The right shows each DLC on its own. Room switches determine the actual result.",
+  "大厅展示已安装 DLC 的独立预览；实际是否生效由房间开关决定。": "The lobby previews each installed DLC separately. Room switches determine what takes effect.",
+  "本房已启用": "Enabled in this room",
+  "本房未启用": "Disabled in this room",
+  "大厅预览": "Lobby preview",
+  "DLC 专属干员": "DLC-only operator",
+  "本体没有这个干员；仅在启用此 DLC 的房间中出现。": "This operator is not in the base game and appears only in rooms with this DLC enabled.",
+  "本体": "Base game",
+  "此 DLC 还提供干员战斗逻辑；下面的包内容说明不等同于此干员的逐项效果。": "This DLC also supplies operator battle logic. The pack notes below are not an operator-specific effect list.",
+  "查看此 DLC 的战斗内容说明": "View this DLC's gameplay notes",
+  "效果参数": "Effect parameters",
+  "本房最终": "Final in this room",
+  "驻防": "Garrison"
 }

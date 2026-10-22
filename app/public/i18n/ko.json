@@ -2769,5 +2769,21 @@
   "故事集盟约类型与禁用抽签规则，并处理专属干员的本局禁用。": "Side Story bond type, ban selection rules, and bans for exclusive operators.",
   "局内盟约徽标、开局简报分区与结算报告分区。": "In-match bond badge, briefing section, and results report section.",
   "攻速、法抗、技力回复、再部署时间等可供故事集盟约使用的公共效果。": "Shared effects for attack speed, resistance, SP recovery, and redeployment time.",
-  "本包自身不新增干员、盟约或策略；多索雷斯需要它作为规则前置。": "This pack adds no operators, bonds, or strategies by itself. Dossoles requires its rules."
+  "本包自身不新增干员、盟约或策略；多索雷斯需要它作为规则前置。": "This pack adds no operators, bonds, or strategies by itself. Dossoles requires its rules.",
+  "DLC 对比": "DLC 비교",
+  "DLC 对比资料暂不可用": "DLC 비교 자료를 사용할 수 없습니다",
+  "此干员没有已安装 DLC 的改动": "설치된 DLC에서 변경한 내용이 없습니다",
+  "左侧为本体与公共包，右侧为各 DLC 单独加入后的变化。本房实际内容由开关决定。": "왼쪽은 기본 게임과 공통 팩, 오른쪽은 각 DLC를 따로 적용한 변경 사항입니다. 실제 적용은 방 설정에 따릅니다.",
+  "大厅展示已安装 DLC 的独立预览；实际是否生效由房间开关决定。": "로비에서는 설치된 DLC를 각각 미리 봅니다. 실제 적용 여부는 방 설정에 따릅니다.",
+  "本房已启用": "이 방에서 사용",
+  "本房未启用": "이 방에서 사용 안 함",
+  "大厅预览": "로비 미리보기",
+  "DLC 专属干员": "DLC 전용 오퍼레이터",
+  "本体没有这个干员；仅在启用此 DLC 的房间中出现。": "기본 게임에는 없으며 이 DLC를 켠 방에서만 등장합니다.",
+  "本体": "기본 게임",
+  "此 DLC 还提供干员战斗逻辑；下面的包内容说明不等同于此干员的逐项效果。": "이 DLC에는 전투 로직도 포함됩니다. 아래 팩 설명은 이 오퍼레이터의 개별 효과 목록이 아닙니다.",
+  "查看此 DLC 的战斗内容说明": "DLC 전투 내용 보기",
+  "效果参数": "효과 수치",
+  "本房最终": "이 방의 최종 값",
+  "驻防": "주둔"
 }

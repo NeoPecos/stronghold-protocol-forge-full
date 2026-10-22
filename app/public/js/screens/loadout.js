@@ -57,10 +57,66 @@ import { diyCount, sanitizeDiyPicks, setPick, serializeDiy, parseDiyImport, DIY_
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { copyText } from '../ui/clipboard.js';
 import { toast } from '../ui/toasts.js';
+import { DLC_PACKS } from '../../../shared/dlc.js';
 
 export { openLoadout, closeLoadout };
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
+let dlcPreviewPromise = null;
+const fetchDlcPreview = () => {
+  if (!dlcPreviewPromise) dlcPreviewPromise = fetch('/data/dlc-preview.json')
+    .then((response) => response.ok ? response.json() : null).catch(() => null);
+  return dlcPreviewPromise;
+};
+const dlcName = (id) => t(DLC_PACKS.find((pack) => pack.id === id)?.name || id);
+const dlcEntries = (preview, chess, golden) => {
+  const entries = [...(preview?.byChess?.[chess?.chessId] || []), ...(preview?.byChess?.[golden?.chessId] || [])];
+  return [...new Set(entries.map((entry) => entry.pack))];
+};
+const DLC_FIELD_NAMES = Object.freeze({
+  stats: '数值', trait: '特性', talents: '天赋', skill: '技能', skills: '技能', modules: '模组', module: '模组',
+  bonds: '盟约', garrisonIds: '驻防', potDown: '潜能', bb: '效果参数', desc: '描述',
+});
+const dlcFieldName = (path) => path.split('.').map((part) => DLC_FIELD_NAMES[part] ? t(DLC_FIELD_NAMES[part]) : part).join(' · ');
+const dlcValue = (value) => value == null ? '—' : typeof value === 'string' ? value : JSON.stringify(value);
+const dlcValueAt = (record, path) => path.split('.').reduce((value, part) => {
+  if (Array.isArray(value)) return value[Number(part) - 1];
+  return value?.[part];
+}, record);
+
+function DlcCompare({ chess, golden, preview, roomDlc }) {
+  if (!preview) return html`<p class="lo-dlc__empty">${t('DLC 对比资料暂不可用')}</p>`;
+  const ids = dlcEntries(preview, chess, golden);
+  if (!ids.length) return html`<p class="lo-dlc__empty">${t('此干员没有已安装 DLC 的改动')}</p>`;
+  return html`<section class="lo-dlc">
+    <p class="lo-dlc__intro">${roomDlc ? t('左侧为本体与公共包，右侧为各 DLC 单独加入后的变化。本房实际内容由开关决定。')
+      : t('大厅展示已安装 DLC 的独立预览；实际是否生效由房间开关决定。')}</p>
+    ${ids.map((id) => {
+      const pack = DLC_PACKS.find((entry) => entry.id === id);
+      const records = [
+        ...(preview.byChess?.[chess?.chessId] || []).filter((entry) => entry.pack === id).map((entry) => ({ ...entry, form: t('普通'), current: chess })),
+        ...(preview.byChess?.[golden?.chessId] || []).filter((entry) => entry.pack === id).map((entry) => ({ ...entry, form: t('精锐'), current: golden })),
+      ];
+      return html`<article class="lo-dlc__pack" key=${id}>
+        <header><h3>${dlcName(id)}</h3><span class=${cx('lo-dlc__state', roomDlc && !roomDlc.includes(id) && 'is-off')}>
+          ${roomDlc ? roomDlc.includes(id) ? t('本房已启用') : t('本房未启用') : t('大厅预览')}</span></header>
+        ${records.map((record) => html`<div class="lo-dlc__form">
+          <h4>${record.form}${record.added ? ` · ${t('DLC 专属干员')}` : ''}</h4>
+          ${record.added ? html`<p>${t('本体没有这个干员；仅在启用此 DLC 的房间中出现。')}</p>` : null}
+          ${record.fields.map((field) => html`<div class="lo-dlc__change">
+            <b>${field.bondId ? `${t('盟约')} · ${data.lookup('bonds', field.bondId)?.name || field.bondId} · ` : ''}${dlcFieldName(field.path)}</b>
+            <div class=${cx('lo-dlc__pair', roomDlc && 'has-final')}><div><small>${t('本体')}</small><p>${dlcValue(field.before)}</p></div>
+              <div><small>${dlcName(id)}</small><p>${dlcValue(field.after)}</p></div>
+              ${roomDlc ? html`<div><small>${t('本房最终')}</small><p>${dlcValue(dlcValueAt(field.bondId ? data.lookup('bonds', field.bondId) : record.current, field.path))}</p></div>` : null}</div>
+          </div>`)}
+          ${record.kit ? html`<p class="lo-dlc__kit">${t('此 DLC 还提供干员战斗逻辑；下面的包内容说明不等同于此干员的逐项效果。')}</p>` : null}
+        </div>`)}
+        ${pack ? html`<details class="lo-dlc__notes"><summary>${t('查看此 DLC 的战斗内容说明')}</summary>
+          <ul>${pack.contents.map((line) => html`<li>${t(line)}</li>`)}</ul></details>` : null}
+      </article>`;
+    })}
+  </section>`;
+}
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
 
 // ---- export / import (干员调配 presets) -----------------------------------------------------------------------------
@@ -202,7 +258,7 @@ export function RosterHead() {
  * `level` 'elite': the skills' details at 精锐 Lv.7 (the shared preview). A chess marked not owned (干员持有) shows the
  * 「替补」 tag: its stand-in fights with a fixed skill and no 潜能 / 练度, the choices here apply once it is owned again.
  */
-export function RosterRow({ m, chess, golden, entries, ops = {}, selected, onPick, onChange, onOps, level = 'normal', notOwned = false }) {
+export function RosterRow({ m, chess, golden, entries, ops = {}, selected, onPick, onChange, onOps, level = 'normal', notOwned = false, dlcPacks = [] }) {
   const choice = effectiveChoice(entries, chess, golden);
   const opt = chessOptions(chess, golden);
   const cv = cultivationView(chess.charId, ops);
@@ -220,6 +276,7 @@ export function RosterRow({ m, chess, golden, entries, ops = {}, selected, onPic
       </span>
       <span class="lo-card__id">
         <span class="lo-card__name">${chess.name}</span>
+        ${dlcPacks.length ? html`<span class="lo-dlc__badge">DLC · ${dlcPacks.map(dlcName).join(' / ')}</span>` : null}
         <span class="lo-card__bonds">${(chess.bonds || []).map((b) => html`<${Img} key=${b} src=${bondIconUrl(m, b)} class="lo-card__bond"
           alt=${data.lookup('bonds', b)?.name || b} fallback=${html`<i class="lo-bond__dot" title=${data.lookup('bonds', b)?.name || b}></i>`} />`)}</span>
         ${notOwned ? html`<span class="lo-card__sub" title=${t('未持有（干员持有）：由替补干员上场')}>${t('替补')}</span>` : null}
@@ -347,7 +404,7 @@ function ConflictSwitch({ conflicts, picks = {}, chess, golden, onPick }) {
   </div>`;
 }
 
-function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset, locked, level = 'normal', onLevel, notOwned = false, conflict = {}, conflicts = undefined, onConflict = null }) {
+function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset, locked, level = 'normal', onLevel, notOwned = false, conflict = {}, conflicts = undefined, onConflict = null, dlcPreview = null, roomDlc = null }) {
   const [tab, setTab] = useState('skill');
   const [statLevel, setStatLevel] = useState('elite'); // 局内数值: the 精锐 shows the chosen module's effect
   const setLevel = onLevel;
@@ -370,6 +427,7 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
         <div class="lo-dhead__chips"><${TierChip} tier=${chess.tier} size="md" />
           ${changed ? html`<span class="lo-badge lo-badge--changed">${t('已调整')}</span>` : html`<span class="lo-badge lo-badge--plain">${t('默认配置')}</span>`}</div>
         <h2 class="lo-dhead__name">${chess.name}</h2>
+        ${dlcEntries(dlcPreview, chess, golden).length ? html`<span class="lo-dlc__badge">DLC · ${dlcEntries(dlcPreview, chess, golden).map(dlcName).join(' / ')}</span>` : null}
         <span class="lo-dhead__en">${chess.appellation || ''}</span>
         <span class="lo-dhead__class">
           <${Img} src=${profGlyphUrl(m, chess.profession)} class="lo-dhead__prof lo-profglyph" />${profName(chess.profession, chess)}
@@ -383,11 +441,12 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
     </div>
     ${onConflict ? html`<${ConflictSwitch} conflicts=${conflicts} picks=${conflict} chess=${chess} golden=${golden} onPick=${onConflict} />` : null}
     <div class="lo-dtabs" role="tablist" aria-label=${t('调配项目')}>
-      ${[['skill', t('技能'), 'SKILL'], ['mod', t('模组'), 'MODULE'], ['stats', t('数值'), 'STATS'], ['voice', t('语音'), 'VOICE'], ['skin', t('换装'), 'SKIN'], ['growth', t('培养'), 'GROWTH']]
+      ${[['skill', t('技能'), 'SKILL'], ['mod', t('模组'), 'MODULE'], ['stats', t('数值'), 'STATS'], ['dlc', t('DLC 对比'), 'DLC'], ['voice', t('语音'), 'VOICE'], ['skin', t('换装'), 'SKIN'], ['growth', t('培养'), 'GROWTH']]
         .filter(([key]) => key !== 'mod' || !!golden).map(([key, label, en]) => html`<button key=${key} type="button" role="tab" aria-selected=${activeTab === key ? 'true' : 'false'}
           class=${cx('lo-dtab', activeTab === key && 'is-on')} onClick=${() => setTab(key)}>${label} <span class="lo-dtab__en num">${en}</span></button>`)}
     </div>
     <div class="lo-detail__body" ref=${bodyRef}>
+      ${activeTab === 'dlc' ? html`<${DlcCompare} chess=${chess} golden=${golden} preview=${dlcPreview} roomDlc=${roomDlc} />` : null}
       ${activeTab === 'voice' ? html`<${OperatorVoice} charId=${chess.charId} />` : null}
       ${activeTab === 'skin' ? html`<${SkinSection} charId=${chess.charId} />` : null}
       ${activeTab === 'growth' ? html`<${CultivationSection} charId=${chess.charId} ops=${ops} onSet=${onOps} standIn=${notOwned} />` : null}
@@ -488,7 +547,7 @@ function PotPips({ n }) {
  * skill and module, 潜能, name and bonds; a 替补 ribbon when marked not owned. `quick` ('skill' | 'module' | 'cult') adds a
  * column of quick choices beside the card — the same handlers as the list's RosterRow.
  */
-export function OpCard({ m, chess, golden, entries, ops = {}, selected = false, quick = null, onPick, onChange, onOps, notOwned = false }) {
+export function OpCard({ m, chess, golden, entries, ops = {}, selected = false, quick = null, onPick, onChange, onOps, notOwned = false, dlcPacks = [] }) {
   const choice = effectiveChoice(entries, chess, golden);
   const opt = chessOptions(chess, golden);
   const cv = opsOf(ops, chess.charId);
@@ -521,6 +580,7 @@ export function OpCard({ m, chess, golden, entries, ops = {}, selected = false, 
         </span>
       </button>
       <span class="lo-op__meta"><${PotPips} n=${cv.potential} /><span class="lo-op__name">${chess.name}</span></span>
+      ${dlcPacks.length ? html`<span class="lo-dlc__badge">DLC · ${dlcPacks.map(dlcName).join(' / ')}</span>` : null}
       <span class="lo-op__bonds">${(chess.bonds || []).map((b) => html`<span key=${b} class="lo-op__bond" title=${data.lookup('bonds', b)?.name || b}>
         <${Img} src=${bondIconUrl(m, b)} fallback=${html`<i class="lo-bond__dot"></i>`} /></span>`)}</span>
     </div>
@@ -594,7 +654,7 @@ function useDragScroll() {
  * The deck: one group per tier present in `list` (a tall marker, then the cards flowing in two rows), the 甄选 card closing
  * tiers 5 / 6. A vertical wheel scrolls it sideways; `onTier` reports the tier group at the left edge (the bottom bar).
  */
-function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps, onDiy, diySlots, diyPicks, deckRef, drawer, onTier, filtered }) {
+function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps, onDiy, diySlots, diyPicks, deckRef, drawer, onTier, filtered, dlcPreview }) {
   const groups = TIERS.map((tier) => ({ tier, items: list.filter((c) => c.tier === tier) }))
     .filter((g) => g.items.length || (!filtered && diySlots.some((s) => s.tier === g.tier)));
   const raf = useRef(0);
@@ -627,7 +687,7 @@ function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps
       <div class="lo-tgrid">
         ${g.items.map((c) => html`<${OpCard} key=${c.chessId} m=${m} chess=${c} golden=${c.goldenId ? getChess(c.goldenId) : null}
           entries=${st.entries} ops=${st.ops} selected=${c.chessId === selId} quick=${quick} onPick=${onPick} onChange=${onChange} onOps=${onOps}
-          notOwned=${(st.notOwned || []).includes(c.chessId)} />`)}
+          notOwned=${(st.notOwned || []).includes(c.chessId)} dlcPacks=${dlcEntries(dlcPreview, c, c.goldenId ? getChess(c.goldenId) : null)} />`)}
         ${!filtered ? html`<${DiyDeckCard} m=${m} tier=${g.tier} slots=${diySlots} picks=${diyPicks} onOpen=${onDiy} />` : null}
       </div>
     </section>`)}
@@ -815,6 +875,13 @@ function LoadoutScreen({ st, leaving = false }) {
   // 列进来只会每次开干员调配打一次 GET /data/skins.json -> 404 + 一条 console 警告。包版自己也不读这个文件
   // （只有导出/导入用 skinsStore），且 useData 的 `missing` 本来就算已结算，所以去掉它不改任何可见行为。
   const ready = useData('chess', 'bonds', 'assets', 'local', 'backups', 'garrisons', 'effects');
+  const [dlcPreview, setDlcPreview] = useState(null);
+  const roomDlc = useStore((s) => s.room ? s.room.dlc?.enabled || [] : null);
+  useEffect(() => {
+    let active = true;
+    void fetchDlcPreview().then((preview) => { if (active) setDlcPreview(preview); });
+    return () => { active = false; };
+  }, []);
   const phase = useStore((s) => s.match?.public?.phase || null);
   const inMatch = useStore((s) => !!s.room?.inMatch);
   // co-op briefing (INFO_CHECK, 25 s): the overlay covers the briefing's own countdown, so it shows the time left — the
@@ -1099,7 +1166,7 @@ function LoadoutScreen({ st, leaving = false }) {
   const loadoutDetail = html`<${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} ops=${st.ops} onChange=${change} onOps=${setOpsOf} onReset=${resetOne} locked=${locked}
     level=${golden ? previewLevel : 'normal'} onLevel=${setPreviewLevel}
     conflict=${st.conflict} conflicts=${st.conflicts} onConflict=${setConflictPick}
-    notOwned=${!!base && (st.notOwned || []).includes(base.chessId)} />`;
+    notOwned=${!!base && (st.notOwned || []).includes(base.chessId)} dlcPreview=${dlcPreview} roomDlc=${roomDlc} />`;
 
   return html`<${Fragment}>
   <div class=${cx('lo', deck && 'lo--deck', leaving && 'is-leaving')} role="dialog" aria-modal="true" aria-label=${t('干员调配')}>
@@ -1211,7 +1278,7 @@ function LoadoutScreen({ st, leaving = false }) {
           ? html`<${ItemCodex} m=${m} items=${codex} deckRef=${deckRef} onOpen=${setItemIdx} onTier=${setActiveTier} />
             ${itemIdx != null ? html`<${ItemDetail} m=${m} items=${codex} index=${itemIdx} all=${data.get('items')} onIndex=${setItemIdx} onClose=${() => setItemIdx(null)} />` : null}`
           : html`<${DeckView} m=${m} list=${list} getChess=${getChess} st=${st} selId=${selId} quick=${quick} onPick=${pick} onChange=${quickChange} onOps=${setOpsOf}
-              onDiy=${() => setTab('diy')} diySlots=${diySlots} diyPicks=${diyLegal} deckRef=${deckRef} drawer=${drawer && !!base} onTier=${setActiveTier} filtered=${nFilters > 0} />
+              onDiy=${() => setTab('diy')} diySlots=${diySlots} diyPicks=${diyLegal} deckRef=${deckRef} drawer=${drawer && !!base} onTier=${setActiveTier} filtered=${nFilters > 0} dlcPreview=${dlcPreview} />
             ${drawer && base ? html`<div class="lo-drawer" data-testid="loadout-drawer">
               <button type="button" class="lo-drawer__close" onClick=${() => setDrawer(false)} title=${t('收起 (Esc)')}><${Icon} name="chevronLeft" />${t('收起')}</button>
               ${loadoutDetail}
@@ -1226,7 +1293,7 @@ function LoadoutScreen({ st, leaving = false }) {
           <div class="lo-list__rows" role="list" aria-label=${t('干员列表')}>
             ${list.length ? list.map((c) => html`<${RosterRow} key=${c.chessId} m=${m} chess=${c} golden=${c.goldenId ? getChess(c.goldenId) : null}
               entries=${st.entries} ops=${st.ops} selected=${c.chessId === selId} onPick=${pick} onChange=${quickChange} onOps=${setOpsOf}
-              level=${previewLevel} notOwned=${(st.notOwned || []).includes(c.chessId)} />`) : html`<p class="lo-empty t-dim">${t('没有符合条件的干员')}</p>`}
+              level=${previewLevel} notOwned=${(st.notOwned || []).includes(c.chessId)} dlcPacks=${dlcEntries(dlcPreview, c, c.goldenId ? getChess(c.goldenId) : null)} />`) : html`<p class="lo-empty t-dim">${t('没有符合条件的干员')}</p>`}
           </div>
         </div>
       </section>

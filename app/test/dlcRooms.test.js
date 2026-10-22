@@ -33,6 +33,9 @@ test('room DLC controls actual content, consent, and public room labels', async 
   let guest;
   try {
     server = await startServer({ port: 0, host: '127.0.0.1', quiet: true, workshopDir: root });
+    const preview = await (await fetch(`http://127.0.0.1:${server.port}/data/dlc-preview.json`)).json();
+    assert.ok(preview.available.includes('dossoles'));
+    assert.equal(preview.available.includes('side-story'), false);
     const url = `ws://127.0.0.1:${server.port}/ws`;
     host = await TestClient.connect(url);
     guest = await TestClient.connect(url);

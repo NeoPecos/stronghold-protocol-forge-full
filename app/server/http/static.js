@@ -240,6 +240,8 @@ export function createStaticHandler({
   // 按房间的游戏数据 (W-B, DESIGN §28.16): `(digest) => { data } | null` from server/roomAssets.js. Null on a plain
   // install (no packs ⇒ every room runs the process data), and the `/room-data/` branch is skipped then.
   roomData = null,
+  // Per-DLC operator differences, computed from the same workshop materialiser as rooms.
+  dlcPreview = null,
   // 包声明的战斗逻辑模块（`server.battle`, DESIGN §28.17）的 URL → 磁盘文件。空 map = 没有包声明它，那条路由不服务任何
   // URL（与 `/workshop-kits/` 同一条不变量）。
   workshopBattleFiles = null,
@@ -456,6 +458,11 @@ export function createStaticHandler({
         res.end(req.method === 'HEAD' ? undefined : result.body);
         return;
       }
+    }
+    if (dlcPreview && decoded === '/data/dlc-preview.json') {
+      res.writeHead(200, { 'Content-Type': MIME['.json'], 'Content-Length': dlcPreview.length, 'Cache-Control': 'no-cache' });
+      res.end(req.method === 'HEAD' ? undefined : dlcPreview);
+      return;
     }
     // 按房间的游戏数据（W-B, DESIGN §28.16）：一个**声明了自己模组集合**的房间跑的是「官方 + 它点名的那几个包」，
     // 而 `/data/*.json` 送的是「官方 + 全部已装包」。所以这一局的对局数据从这里取：`/room-data/<摘要>/<文件>.json`。

@@ -31,8 +31,8 @@ function statusText(row) {
   return `大厅 · ${row.code || ''}`;
 }
 
-async function asFriend(name) {
-  return net.request('friend.request', { name }).catch((error) => {
+async function asFriend(name, playerId) {
+  return net.request('friend.request', { name, ...(playerId ? { playerId } : {}) }).catch((error) => {
     // 服务端返回错误码；统一转成可读文案抛回去，调用方负责提示
     throw new Error(error?.message || '好友申请失败');
   });
@@ -62,8 +62,8 @@ export async function refreshFriends() {
   return net.request('friend.list', {}).catch(() => null);
 }
 
-export function requestFriend(name) {
-  return asFriend(String(name || '').trim());
+export function requestFriend(name, playerId = null) {
+  return asFriend(String(name || '').trim(), playerId);
 }
 
 function ensureHost() {

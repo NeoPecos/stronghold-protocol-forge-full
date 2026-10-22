@@ -370,6 +370,27 @@
 .lo-badge--on { color: #0b1a26; background: #1ea0ff; }
 .lo-badge--changed { color: var(--text-on-mint); background: var(--mint-500); }
 .lo-badge--plain { color: var(--text-dim); border: 1px solid var(--line-2); }
+.lo-dlc__badge { display: inline-block; max-width: 100%; padding: .02rem .07rem; border: 1px solid #d69f53; color: #ffd18e; background: #47311c; font-size: max(.11rem, 9px); line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lo-dlc { padding: .16rem; }
+.lo-dlc__intro,.lo-dlc__empty { color: var(--text-dim); line-height: 1.6; }
+.lo-dlc__pack { margin: .16rem 0; padding: .14rem; border: 1px solid var(--line-2); background: rgba(15, 30, 27, .8); }
+.lo-dlc__pack > header { display: flex; align-items: center; justify-content: space-between; gap: .1rem; }
+.lo-dlc__pack h3 { margin: 0; color: var(--mint-500); font-size: .2rem; }
+.lo-dlc__state { color: var(--mint-500); font-size: .13rem; }
+.lo-dlc__state.is-off { color: var(--text-dim); }
+.lo-dlc__form h4 { margin: .13rem 0 .06rem; font-size: .16rem; }
+.lo-dlc__change { margin: .09rem 0; padding: .08rem; border: 1px solid var(--line-2); overflow-wrap: anywhere; }
+.lo-dlc__change > b { display: block; margin-bottom: .05rem; color: #ffd18e; font-size: .13rem; }
+.lo-dlc__pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .08rem; }
+.lo-dlc__pair.has-final { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lo-dlc__pair > div { min-width: 0; padding: .07rem; background: rgba(0, 0, 0, .22); }
+.lo-dlc__pair small { color: var(--text-dim); }
+.lo-dlc__pair p { margin: .05rem 0 0; white-space: pre-wrap; line-height: 1.55; }
+.lo-dlc__kit { color: #ffd18e; line-height: 1.5; }
+.lo-dlc__notes { margin-top: .13rem; color: var(--text-dim); line-height: 1.55; }
+.lo-dlc__notes summary { cursor: pointer; color: var(--mint-500); }
+.lo-dlc__notes li { margin: .06rem 0; }
+@media (max-width: 650px) { .lo-dlc__pair,.lo-dlc__pair.has-final { grid-template-columns: 1fr; } }
 
 /* modules */
 .lo-mods { display: flex; flex-wrap: wrap; gap: .08rem; }

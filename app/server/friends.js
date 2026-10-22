@@ -264,7 +264,9 @@ export function createFriendsService({ store, accounts, registry, lobby, log = {
 
     if (msg.t === 'friend.request') {
       const target = resolve(msg.name);
-      if (!target) return { error: 'FRIEND_UNKNOWN' };
+      // Lobby chat supplies the server-stamped sender id. Reject a forged
+      // display name instead of sending the request to a different account.
+      if (!target || (msg.playerId != null && target.playerId !== msg.playerId)) return { error: 'FRIEND_UNKNOWN' };
       if (target.playerId === self.playerId) return { error: 'FRIEND_SELF' };
       const result = store.request({ playerId: self.playerId, name: self.name }, { playerId: target.playerId, name: target.name });
       if (result.error) return result;
