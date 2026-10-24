@@ -37,6 +37,8 @@
 import http from 'node:http';
 import path from 'node:path';
 import { getData, loadData } from './data.js';
+import { applyWorkshop } from '../shared/workshop.js';
+import { DLC_IDS, basePackIds } from '../shared/dlc.js';
 import { loadWorkshop, loadWorkshopKits, loadWorkshopHooks, modDeclarationsFor, dropUnavailablePreDispatchPacks, adjudicatePackGraph, WORKSHOP_DIR } from './workshop.js';
 import { readModRegistry, applyModRegistry } from './modRegistry.js';
 import { loadMetaModules } from './match/metaPack.js';
@@ -45,6 +47,7 @@ import { loadRoomInstallers } from './roomPack.js';
 import { loadServerModules, mountServerModules, stateRootFor, bootConfigSnapshot } from './modModules.js';
 import { materializeVoiceCdn, dropFailedVoiceCdnFiles } from './voiceCdn.js';
 import { workshopNotices } from './notices.js';
+import { createAnnouncementStore } from './announcementStore.js';
 import { createRoomAssets } from './roomAssets.js';
 import { Match as DefaultMatch } from './match/Match.js';
 import {
@@ -252,6 +255,10 @@ export async function startServer(opts = {}) {
   const roomInstallers = roomPack.installers.filter((m) => survivors.has(m.id));
   const modMount = mountServerModules(serverModulesLive, { log });
   const excludedPacks = new Set([...pruned.removed.map((r) => r.pack), ...registryApplied.disabled.map((d) => d.id), ...adjudicated.refused.map((r) => r.id)]);
+  // a5: DLC content is room-scoped. Keep the shared /data face on the permanent packs only; a room's selected
+  // combination is materialised by roomAssets below. DLC packs remain in workshopLoaded so their data and behaviour
+  // can be restored for the rooms that selected them.
+  const processExcludePacks = new Set([...excludedPacks, ...DLC_IDS]);
   // The process-wide singleton serves the default data dir; a custom dir (tests) gets its own copy. The 创意工坊 overlay
   // is applied inside the loader (server/data.js), i.e. whichever way the data is obtained, it is already merged.
   // SP_WORKSHOP (editor/playtest.mjs) lets the Forge editor's 试玩 subprocess read the workshop root the editor was
@@ -262,15 +269,19 @@ export async function startServer(opts = {}) {
   // is exactly why SP_WORKSHOP has to take the loadData() branch, or the 试玩 subprocess would silently read the wrong
   // (empty) pack root.
   // `excludePacks` 让那一层也遵守同一次裁剪（`server/data.js`）：不这样做，被裁的包会留下一个「谁都不认识的干员」。
-  const data = (opts.dataDir || opts.workshopDir !== undefined || envWorkshop)
-    ? loadData(dataDir, { log, workshopDir, excludePacks: excludedPacks })
-    : getData({ dir: dataDir, log, workshopDir, excludePacks: excludedPacks });
+  const data = (opts.dataDir || opts.workshopDir !== undefined || envWorkshop || processExcludePacks.size)
+    ? loadData(dataDir, { log, workshopDir, excludePacks: processExcludePacks })
+    : getData({ dir: dataDir, log, workshopDir, excludePacks: processExcludePacks });
   // 创意工坊 (docs/WORKSHOP.md): 装载一次，派生运行时要的三件东西 ——
   //   * workshopJson      the /data files the browser must receive merged instead of the on-disk originals;
   //   * workshopKits.kits the behaviour layer (a per-battle kit map) for battles the server itself runs;
   //   * workshopKitFiles  the URLs serving those same kit modules to the browser, which must rebuild the identical map,
   //                       or its client-simulated battle would disagree with the server's verification.
   const workshopLoaded = { ...loadedForPayloads, packs: pruned.packs, errors: pruned.errors };
+  // The process face intentionally omits DLC, while kit target validation and the conflict index must know the full
+  // installed content. Build that full face once from official data and all surviving packs.
+  const officialData = (workshopLoaded.packs || []).length ? loadData(dataDir, { log, workshopDir: null }) : null;
+  const fullFace = officialData ? applyWorkshop(officialData, workshopLoaded.packs).data : data;
   // 作者自备 CDN 的语音素材（`pack.json.voices` / `voiceLangs` 里的 `{ url, sha256, file }` 条目，DESIGN §28.33）：
   // 在**合并语音表之前**把字节取到本地缓存并按作者声明的 sha256 核对。四条纪律见 `server/voiceCdn.js`；
   // 这里负责两件事 —— **逐条点名**（失败绝不静默）与**把取不到的那几条从语音表里摘掉**（宁可回落到默认配音，
@@ -282,6 +293,8 @@ export async function startServer(opts = {}) {
   // 包 id 追加。它走**既有的**合并数据通道送出（`/data/notices.json`，map 的键是 `notices`），所以既没有新路由、
   // 也没有新的静态路径；`data/notices.json` 本来就不存在，所以这纯属新增。
   const notices = workshopNotices(workshopLoaded, { changelogPath: path.join(ROOT, 'CHANGELOG.md'), log });
+  // 公告（主服移植）：文件型存储，发布走 `node tools/announcements.mjs publish`，读取时每次读盘、无需重启。
+  const announcements = createAnnouncementStore({ dir: path.join(ROOT, 'var', 'announcements'), root: ROOT, log });
   workshopJson.set('notices', Buffer.from(JSON.stringify(notices.body), 'utf8'));
   // 行为层的**两个键空间**（docs/WORKSHOP.md §4.7）：一个 `kits/<id>.js` 的 id 要么是**干员键**（`kitOf`：
   // `def.charId` / `def.baseId` / `def.id`），要么是**召唤物键**（token 记录的 id：`tokens.kits?.[def.id]`）。
@@ -292,10 +305,10 @@ export async function startServer(opts = {}) {
   const workshopKits = await loadWorkshopKits(workshopLoaded, {
     log,
     knownIds: new Set([
-      ...Object.keys(data.chess || {}),
+      ...Object.keys(fullFace.chess || {}),
       ...((workshopLoaded.packs || []).flatMap((p) => Object.keys(p.operators || {}))),
     ]),
-    knownTokenIds: new Set(Object.keys(data.tokens || {})),
+    knownTokenIds: new Set(Object.keys(fullFace.tokens || {})),
   });
   // The mod set (DESIGN §28.2): one identity per pack, one digest for the whole set. It travels in `welcome`, in
   // `/healthz` (lobby.stats) and in every BattleSpec, so the three can never disagree about what is running.
@@ -320,11 +333,11 @@ export async function startServer(opts = {}) {
   const workshopBattleFiles = workshopBattleFilesFor(battleModules, workshopDir);
   // 按房间物化（W-B，DESIGN §28.9）：房间声明的集合要真的决定这一局跑什么。只在**装了包**时建它 ——
   // 干净安装既不需要官方那一份的第二次读取，也没有任何集合会比「进程级那一份」更小。
-  const officialData = (workshopLoaded.packs || []).length ? loadData(dataDir, { log, workshopDir: null }) : null;
   const roomAssets = officialData
     ? createRoomAssets({
       official: officialData,
       processData: data,
+      processPackIds: basePackIds(workshopMods),
       packs: workshopLoaded.packs,
       kits: workshopKits.kits,
       kitOwners: workshopKits.owners,
@@ -467,7 +480,7 @@ export async function startServer(opts = {}) {
   const traffic = createTrafficCounter();
   const healthDeps = { startedAt, network, registry, lobby, modHealth: () => modMount.healthz(), content, traffic, assetIndex, views, trusted: trustedRuntime?.health };
   const admin = createAdminApi({ lobby, registry, log, health: { report: () => healthReport(healthDeps, false) } });
-  const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health: healthDeps, log, admin,
+  const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health: healthDeps, log, admin, announcements,
     records, accounts,
     largeAssets: {
       path: LARGE_ASSETS_STATUS_PATH, status: largeAssetsStatus,
@@ -484,7 +497,7 @@ export async function startServer(opts = {}) {
     // 的是**进程单例**：`npm start`（缺省工坊根）下两者恰好是同一个，但一个自定义 `workshopDir`（测试 / SP_WORKSHOP
     // 的试玩子进程）下 `data` 是**另一次**装载，而单例可能还带着仓库 `workshop/` 那一份内容 —— 那样这条路由就会
     // 把「另一个工坊根有多少冲突」当成这一局的答案报出去。
-    workshopConflicts: { path: '/workshop-conflicts.json', list: () => data.workshopConflicts ?? null },
+    workshopConflicts: { path: '/workshop-conflicts.json', list: () => fullFace.workshopConflicts ?? null },
     // 服务器音乐库（`GET /api/music`，颂乐人偶 Fever 音乐选择）：官方 BGM 目录 + 已装工坊包的 assets/bgm。
     workshopAssets,
     workshopPackNames,

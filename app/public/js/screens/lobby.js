@@ -22,6 +22,7 @@ import { useHubBackdrop, HubBackdrop, HubRadar, BackdropSettings, BackdropGlyph,
 // config.json mode texts come localized from data.js.
 
 import { ResumeMatchButton } from '../ui/resumeMatch.js';
+import { AnnouncementButton } from '../ui/announcements.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS, MAX_SPECTATORS, modeIdFor, clampSeats, ERR, ERR_TEXT, RECON } from '../../../shared/constants.js';
 import { rememberedCapacity, remembersCapacity, setCapacityRemember } from '../ui/roomPrefs.js';
@@ -157,6 +158,8 @@ const MODE_CARDS = [
 
 /** 「全量模拟」强制打的那张试验场关卡 id（工坊包 dev-ext 的 `stages.json`，见该包 README）。 */
 const FULL_SIM_STAGE = 'dev_full_sim';
+/** 精简本地树可能没安装 dev-ext；仍允许在官方第一张战场打开同一套开发者面板。 */
+const FULL_SIM_FALLBACK_STAGE = 'act1autochess_m01';
 
 /** 无限火力分支（随机模式 variant）：快速突袭 9 回合 / 持久鏖战 13 回合。 */
 const VARIANT_CARDS = [
@@ -1251,9 +1254,10 @@ export function LobbyScreen() {
    * 所以这里连房间界面也省了（与编辑器 `?playtest=` 深链的「快速开始」同一条 create+start 顺序）。
    */
   const createFullSim = () => run('create', async () => {
+    const stage = getStage(FULL_SIM_STAGE) ? FULL_SIM_STAGE : FULL_SIM_FALLBACK_STAGE;
     await net.request('room.create', {
       ...roomMods.buildCreatePayload('solo', difficulty),
-      dev: true, stage: FULL_SIM_STAGE,
+      dev: true, stage,
     });
     await net.request('room.start');
   });
@@ -1349,7 +1353,8 @@ export function LobbyScreen() {
         <${PingPill} ms=${conn.ping} online=${online} />
         <span class="topbar__sep" aria-hidden="true"></span>
         <div class="topbar__tools">
-          <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
+          <${AnnouncementButton} variant="secondary" />
+        <${SettingsButton} class="lobby-settings" variant="secondary" square=${true} />
           <${GuideButton} class="lobby-guide" variant="secondary" square=${true} />
           <${Button} variant="secondary" size="sm" square=${true} class="hub-bg-btn" onClick=${() => setBgOpen(true)}
             title=${t('大厅背景')} aria-label=${t('大厅背景')}><${BackdropGlyph} /><//>

@@ -1,0 +1,445 @@
+{
+  "garrison_yuki_a": {
+    "garrisonId": "garrison_yuki_a",
+    "desc": "<获得时>自身所属盟约层数+2（无需激活盟约）",
+    "descRaw": "<获得时>自身所属盟约层数<@ba.vup>+2</>（无需激活盟约）",
+    "eventType": "SERVER_GAIN",
+    "eventTypeDesc": "单次叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_BOND_CHESS_ALL",
+    "effectKey": "SERVER_ADD_BOND_CHESS_ALL",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "count": 2
+    },
+    "bbStr": {},
+    "owners": [
+      "chess_char_1_21_a"
+    ]
+  },
+  "garrison_yuki_b": {
+    "garrisonId": "garrison_yuki_b",
+    "desc": "<获得时>自身所属盟约层数+3（无需激活盟约）",
+    "descRaw": "<获得时>自身所属盟约层数<@ba.vup>+3</>（无需激活盟约）",
+    "eventType": "SERVER_GAIN",
+    "eventTypeDesc": "单次叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_BOND_CHESS_ALL",
+    "effectKey": "SERVER_ADD_BOND_CHESS_ALL",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "count": 3
+    },
+    "bbStr": {},
+    "owners": [
+      "chess_char_1_21_b"
+    ]
+  },
+  "garrison_kichi_a": {
+    "garrisonId": "garrison_kichi_a",
+    "desc": "<休整期结束时>本回合每花费2资金，使已激活的【东】层数+1",
+    "descRaw": "<休整期结束时>本回合每花费2资金，使已激活的【东】层数+1",
+    "eventType": "SERVER_PREP_FIN",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_BOND_ROUND_COIN_COST",
+    "effectKey": "SERVER_ADD_BOND_ROUND_COIN_COST",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "layer": 1,
+      "count": 2
+    },
+    "bbStr": {
+      "bond": "dongShip",
+      "conditionkey": "character_target_inboard"
+    },
+    "owners": [
+      "chess_char_3_kichi_a"
+    ]
+  },
+  "garrison_kichi_b": {
+    "garrisonId": "garrison_kichi_b",
+    "desc": "<休整期结束时>本回合每花费1资金，使已激活的【东】层数+1",
+    "descRaw": "<休整期结束时>本回合每花费1资金，使已激活的【东】层数+1",
+    "eventType": "SERVER_PREP_FIN",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_BOND_ROUND_COIN_COST",
+    "effectKey": "SERVER_ADD_BOND_ROUND_COIN_COST",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "layer": 1,
+      "count": 1
+    },
+    "bbStr": {
+      "bond": "dongShip",
+      "conditionkey": "character_target_inboard"
+    },
+    "owners": [
+      "chess_char_3_kichi_b"
+    ]
+  },
+  "garrison_angelina_dong_a": {
+    "garrisonId": "garrison_angelina_dong_a",
+    "desc": "<休整期结束时>本回合每刷新过1次，使已激活的【东】层数+4（每回合至多12层）",
+    "descRaw": "<休整期结束时>本回合每刷新过1次，使已激活的【东】层数<@ba.vup>+4</>（每回合至多12层）",
+    "eventType": "SERVER_PREP_FIN",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER",
+    "effectKey": "SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "multiplier": 4,
+      "max_layer": 12
+    },
+    "bbStr": {
+      "bond": "dongShip",
+      "conditionkey": "character_target_inboard"
+    },
+    "owners": [
+      "chess_char_5_20_a"
+    ]
+  },
+  "garrison_angelina_dong_b": {
+    "garrisonId": "garrison_angelina_dong_b",
+    "desc": "<休整期结束时>本回合每刷新过1次，使已激活的【东】层数+8（每回合至多24层）",
+    "descRaw": "<休整期结束时>本回合每刷新过1次，使已激活的【东】层数<@ba.vup>+8</>（每回合至多24层）",
+    "eventType": "SERVER_PREP_FIN",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER",
+    "effectKey": "SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "multiplier": 8,
+      "max_layer": 24
+    },
+    "bbStr": {
+      "bond": "dongShip",
+      "conditionkey": "character_target_inboard"
+    },
+    "owners": [
+      "chess_char_5_20_b"
+    ]
+  },
+  "garrison_haruka_dong_a": {
+    "garrisonId": "garrison_haruka_dong_a",
+    "desc": "<休整期结束时>整备区每有1个干员，使已激活的【东】层数+1",
+    "descRaw": "<休整期结束时>整备区每有1个干员，使已激活的【东】层数<@ba.vup>+1</>",
+    "eventType": "SERVER_PREP_FIN",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_BOND_METHOD",
+    "effectKey": "SERVER_ADD_BOND_METHOD",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "multi": 1
+    },
+    "bbStr": {
+      "add_method": "hand_count",
+      "bond": "dongShip",
+      "conditionkey": "character_target_inboard"
+    },
+    "owners": [
+      "chess_char_9_dong1_a"
+    ]
+  },
+  "garrison_haruka_dong_b": {
+    "garrisonId": "garrison_haruka_dong_b",
+    "desc": "<休整期结束时>整备区每有1个干员，使已激活的【东】层数+2",
+    "descRaw": "<休整期结束时>整备区每有1个干员，使已激活的【东】层数<@ba.vup>+2</>",
+    "eventType": "SERVER_PREP_FIN",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "SERVER_ADD_BOND_METHOD",
+    "effectKey": "SERVER_ADD_BOND_METHOD",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "multi": 2
+    },
+    "bbStr": {
+      "add_method": "hand_count",
+      "bond": "dongShip",
+      "conditionkey": "character_target_inboard"
+    },
+    "owners": [
+      "chess_char_9_dong1_b"
+    ]
+  },
+  "garrison_hsgma2_core": {
+    "garrisonId": "garrison_hsgma2_core",
+    "desc": "核心盟约每叠加3层，本干员攻击力和生命值+1.5%",
+    "descRaw": "核心盟约每叠加3层，本干员攻击力和生命值<@ba.vup>+1.5%</>",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.015,
+      "max_hp": 0.015
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "yanShip,kjeragShip,sargonShip,lateranoShip,victoriaShip,egirShip,kazimierzShip,siracusaShip,dongShip"
+    },
+    "owners": [
+      "chess_char_6_hsgma2_a",
+      "chess_char_6_hsgma2_b"
+    ]
+  },
+  "garrison_yato_dong_a": {
+    "garrisonId": "garrison_yato_dong_a",
+    "desc": "<部署时>使自身已激活的盟约层数+2（每场作战至多12层）",
+    "descRaw": "<部署时>使自身已激活的盟约层数<@ba.vup>+2</>（每场作战至多12层）",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "ADD_BOND",
+    "effectKey": "act2autochess_gar_event_onstart",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "bond_add_count": 2,
+      "max_add_count_per_battle": 12
+    },
+    "bbStr": {
+      "key": "act2autochess_gar_event_onstart",
+      "bond_type": "bond_self",
+      "bond_add_type": "by_count",
+      "garrison_key": "garrison_yato_dong_a"
+    },
+    "owners": [
+      "chess_char_9_yato_a"
+    ]
+  },
+  "garrison_yato_dong_b": {
+    "garrisonId": "garrison_yato_dong_b",
+    "desc": "<部署时>使自身已激活的盟约层数+3（每场作战至多24层）",
+    "descRaw": "<部署时>使自身已激活的盟约层数<@ba.vup>+3</>（每场作战至多24层）",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "持续叠加",
+    "eventTypeIcon": "icon_bond",
+    "effectType": "ADD_BOND",
+    "effectKey": "act2autochess_gar_event_onstart",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "bond_add_count": 3,
+      "max_add_count_per_battle": 24
+    },
+    "bbStr": {
+      "key": "act2autochess_gar_event_onstart",
+      "bond_type": "bond_self",
+      "bond_add_type": "by_count",
+      "garrison_key": "garrison_yato_dong_b"
+    },
+    "owners": [
+      "chess_char_9_yato_b"
+    ]
+  },
+  "garrison_saga_dong_a": {
+    "garrisonId": "garrison_saga_dong_a",
+    "desc": "【东】每叠加3层，本干员攻击力、生命值+1.5%，攻击速度+1",
+    "descRaw": "【东】每叠加3层，本干员攻击力、生命值+1.5%，攻击速度+1",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.015,
+      "max_hp": 0.015,
+      "attack_speed": 1
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "dongShip"
+    },
+    "owners": [
+      "chess_char_9_dong2_a"
+    ]
+  },
+  "garrison_saga_dong_b": {
+    "garrisonId": "garrison_saga_dong_b",
+    "desc": "【东】每叠加3层，本干员攻击力、生命值+3%，攻击速度+2",
+    "descRaw": "【东】每叠加3层，本干员攻击力、生命值+3%，攻击速度+2",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.03,
+      "max_hp": 0.03,
+      "attack_speed": 2
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "dongShip"
+    },
+    "owners": [
+      "chess_char_9_dong2_b"
+    ]
+  },
+  "garrison_noirc2_dong_a": {
+    "garrisonId": "garrison_noirc2_dong_a",
+    "desc": "<进入休整期时>若自身所在的排有4枚以上棋子，获得1个等级不高于当前商店等级的【东】干员",
+    "descRaw": "<进入休整期时>若自身所在的排有<@ba.vup>4</>枚以上棋子，获得1个等级不高于当前商店等级的【东】干员",
+    "eventType": "SERVER_PREP_START",
+    "eventTypeDesc": "整备能力",
+    "eventTypeIcon": "icon_gold",
+    "effectType": "SERVER_POOL_CHAR",
+    "effectKey": "SERVER_POOL_CHAR",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "count": 1,
+      "check_count": 4
+    },
+    "bbStr": {
+      "pool": "pool_char_dongShip",
+      "conditionkey": "character_same_row"
+    },
+    "owners": [
+      "chess_char_2_noirc2_a"
+    ]
+  },
+  "garrison_noirc2_dong_b": {
+    "garrisonId": "garrison_noirc2_dong_b",
+    "desc": "<进入休整期时>若自身所在的排有4枚以上棋子，获得2个等级不高于当前商店等级的【东】干员",
+    "descRaw": "<进入休整期时>若自身所在的排有<@ba.vup>4</>枚以上棋子，获得2个等级不高于当前商店等级的【东】干员",
+    "eventType": "SERVER_PREP_START",
+    "eventTypeDesc": "整备能力",
+    "eventTypeIcon": "icon_gold",
+    "effectType": "SERVER_POOL_CHAR",
+    "effectKey": "SERVER_POOL_CHAR",
+    "battleRuneKey": null,
+    "charLevel": 0,
+    "bb": {
+      "count": 2,
+      "check_count": 4
+    },
+    "bbStr": {
+      "pool": "pool_char_dongShip",
+      "conditionkey": "character_same_row"
+    },
+    "owners": [
+      "chess_char_2_noirc2_b"
+    ]
+  },
+  "garrison_haruka_attr_a": {
+    "garrisonId": "garrison_haruka_attr_a",
+    "desc": "【东】每叠加3层，本干员攻击力和生命值+1%",
+    "descRaw": "【东】每叠加3层，本干员攻击力和生命值<@ba.vup>+1%</>",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.01,
+      "max_hp": 0.01
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "dongShip"
+    },
+    "owners": [
+      "chess_char_9_dong1_a"
+    ]
+  },
+  "garrison_haruka_attr_b": {
+    "garrisonId": "garrison_haruka_attr_b",
+    "desc": "【东】每叠加3层，本干员攻击力和生命值+2%",
+    "descRaw": "【东】每叠加3层，本干员攻击力和生命值<@ba.vup>+2%</>",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.02,
+      "max_hp": 0.02
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "dongShip"
+    },
+    "owners": [
+      "chess_char_9_dong1_b"
+    ]
+  },
+  "garrison_akafuyu_dong_a": {
+    "garrisonId": "garrison_akafuyu_dong_a",
+    "desc": "【东】每叠加3层，本干员攻击力、生命值+1.5%",
+    "descRaw": "【东】每叠加3层，本干员攻击力、生命值+1.5%",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.015,
+      "max_hp": 0.015
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "dongShip"
+    },
+    "owners": [
+      "chess_char_9_akafuyu_a"
+    ]
+  },
+  "garrison_akafuyu_dong_b": {
+    "garrisonId": "garrison_akafuyu_dong_b",
+    "desc": "【东】每叠加3层，本干员攻击力、生命值+1.5%",
+    "descRaw": "【东】每叠加3层，本干员攻击力、生命值+1.5%",
+    "eventType": "IN_BATTLE",
+    "eventTypeDesc": "作战能力",
+    "eventTypeIcon": "icon_battle",
+    "effectType": "GAIN_BUFF",
+    "effectKey": "act1autochess_gar_eff_attrByBond",
+    "battleRuneKey": "env_gbuff_new_with_verify",
+    "charLevel": 0,
+    "bb": {
+      "divide_num": 3,
+      "atk": 0.015,
+      "max_hp": 0.015
+    },
+    "bbStr": {
+      "key": "act1autochess_gar_eff_attrByBond",
+      "bond_id": "dongShip"
+    },
+    "owners": [
+      "chess_char_9_akafuyu_b"
+    ]
+  }
+}

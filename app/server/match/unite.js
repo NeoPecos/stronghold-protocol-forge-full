@@ -58,6 +58,7 @@ import { planUniteBySquad } from './unite100.mjs';
  */
 export function planUnite(m, results) {
   if (m.isSolo) return null;
+  if (m.contractFx?.uniteDisabled) return null;
   if (m.variant === true && !m.extendedUnite) return planUniteBySquad(m, results);
   const alive = m.alivePlayers();
   const leakers = [];
@@ -70,7 +71,8 @@ export function planUnite(m, results) {
     else if (r.perfect !== false) perfects.push(ps);
   }
   if (!leakers.length || !perfects.length) return null;
-  const helpers = m.extendedUnite ? extendedHelperOrder(m, perfects, results) : helperOrder(m, perfects, results);
+  const helpers = (m.extendedUnite ? extendedHelperOrder(m, perfects, results) : helperOrder(m, perfects, results))
+    .slice(0, m.contractFx?.uniteMaxHelpers ?? Infinity);
   const leaked = [];
   const notReentered = new Map();
   for (const ps of leakers) {

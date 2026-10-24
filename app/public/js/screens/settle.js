@@ -33,6 +33,7 @@ import { friendsStore, requestFriend, Glyph, THUMB, ADD_FRIEND } from '../ui/fri
 import { NameCardLayer } from '../ui/namecards.js';
 import { toast } from '../ui/toasts.js';
 import { ResultView, resultBonds } from './result.js';
+import { TestMark } from '../ui/testConsole.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -412,7 +413,7 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext }) {
   };
   return html`<section class=${cx('sself', cleared ? 'is-win' : 'is-lose', leaving && 'is-leaving')} data-testid="settle-self">
     <div class="settle__stage">
-      <${SettleMap} lose=${!cleared} seed=${seed} />
+      <${SettleMap} lose=${!cleared} seed=${r.seed} />
       <div class="smap__fx" aria-hidden="true"></div>
       <${Logo} />
       <div class="sself__band">${self.bandId ? html`<${BandIcon} bandId=${self.bandId} size="lg" />` : html`<${PlayerAvatar} player=${self} self=${true} />`}<i aria-hidden="true"></i></div>

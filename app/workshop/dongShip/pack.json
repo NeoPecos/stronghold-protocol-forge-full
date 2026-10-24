@@ -1,0 +1,1341 @@
+{
+  "id": "dongShip",
+  "name": "东盟约",
+  "version": "1.2.29",
+  "author": "CLa",
+  "license": "GPL-3.0-or-later（本包代码）；© Hypergryph / Yostar（随包素材，非商业同人使用）",
+  "description": "为《卫戍协议：盟约》加入核心盟约【东】：13 名成员 / 24 枚棋子 / 11 组专属特质（21 条记录，其中 2 个自定义 effectKey 由 server/meta/dong.mjs 实现）/ 1 个战斗层效果（追加攻击 = 攻击力 ×（3.3% + 0.43955% × 层数），按目标弱点类型结算；6 名时附加神经损伤 30/次）；自带 5 名新干员（白雪 / 吉星 / 麒麟R夜刀 / 火龙S黑角 / 赤冬）的头像、立绘、Spine、技能图标与日·中两套战斗语音（140 个 mp3），以及 1 件新装备「艺人见面抽选券」（普通/精锐两张图标）。另外把本包新增干员所属的 7 条官方盟约（精准 / 远见 / 迅捷 / 助力 / 突袭 / 坚守 / 炎）成员表补全，他们在盟约界面里与官方成员一样可见。**1.2.15 起，赤冬的全部增益类数值（生命/攻击/防御、模组加成、特性回血、坚忍攻速、技能增伤与加防）整体上调 20%**（费用、SP、攻击间隔、流失代价不变）。本包会影响对局结果（`pack.json` 已声明 `combat: true`：追加攻击、专属特质、新装备与新干员都能改变一局的结果），装包前请知悉。入口门槛 3 名、强化门槛 6 名不同【东】干员。",
+  "game": "0.2.x",
+  "api": ">=1 <2",
+  "combat": true,
+  "content": [
+    "bonds",
+    "chess",
+    "garrisons",
+    "items"
+  ],
+  "overrides": [
+    "bonds:deputShip",
+    "bonds:indomShip",
+    "bonds:raidShip",
+    "bonds:soloShip",
+    "bonds:steadShip",
+    "bonds:swiftShip",
+    "bonds:visiShip",
+    "bonds:yanShip",
+    "chess:chess_char_1_18_a",
+    "chess:chess_char_1_18_b",
+    "chess:chess_char_2_11_a",
+    "chess:chess_char_2_11_b",
+    "chess:chess_char_4_17_a",
+    "chess:chess_char_4_17_b",
+    "chess:chess_char_5_20_a",
+    "chess:chess_char_5_20_b"
+  ],
+  "art": {
+    "chars": {
+      "char_118_yuki": {
+        "avatar": "char/avatar/char_118_yuki.png",
+        "avatarE2": "char/avatar/char_118_yuki.png",
+        "portrait": "char/portrait/char_118_yuki_1.png",
+        "portraitE2": "char/portrait/char_118_yuki_2.png",
+        "spine": {
+          "front": {
+            "skel": "spine/op/char_118_yuki/front/char_118_yuki.skel",
+            "atlas": "spine/op/char_118_yuki/front/char_118_yuki.atlas",
+            "textures": [
+              "spine/op/char_118_yuki/front/char_118_yuki.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 0,
+                  "idle": null
+                },
+                "1": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 1,
+                  "idle": null
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 2,
+                  "idle": null
+                }
+              }
+            },
+            "animations": {
+              "Attack": 1,
+              "Default": 0,
+              "Die": 1,
+              "Idle": 3,
+              "Start": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack": [
+                0.467
+              ]
+            },
+            "bounds": {
+              "x": -160.695,
+              "y": -0.696,
+              "width": 266.467,
+              "height": 377.002
+            }
+          }
+        }
+      },
+      "char_1030_noirc2": {
+        "avatar": "char/avatar/char_1030_noirc2.png",
+        "avatarE2": "char/avatar/char_1030_noirc2.png",
+        "portrait": "char/portrait/char_1030_noirc2_1.png",
+        "portraitE2": "char/portrait/char_1030_noirc2_2.png",
+        "spine": {
+          "front": {
+            "skel": "spine/op/char_1030_noirc2/front/char_1030_noirc2.skel",
+            "atlas": "spine/op/char_1030_noirc2/front/char_1030_noirc2.atlas",
+            "textures": [
+              "spine/op/char_1030_noirc2/front/char_1030_noirc2.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack_1",
+                "end": null,
+                "via": "attackAny"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_1_Begin",
+                "loop": "Skill_1_Loop",
+                "end": "Skill_1_End",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
+                  "index": 0,
+                  "idle": null
+                },
+                "1": {
+                  "begin": null,
+                  "loop": "Skill_2",
+                  "end": null,
+                  "index": 1,
+                  "idle": null
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Attack_1",
+                  "end": null,
+                  "via": "attack",
+                  "index": 2,
+                  "idle": null
+                }
+              }
+            },
+            "animations": {
+              "Attack_1": 1.2,
+              "Attack_2": 1.2,
+              "Attack_3": 1.2,
+              "Attack_4": 1.2,
+              "Default": 0,
+              "Die": 1,
+              "Idle": 1.2,
+              "Skill_1_Begin": 1,
+              "Skill_1_End": 1,
+              "Skill_1_Loop": 1,
+              "Skill_2": 1.4,
+              "Start": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack_1": [
+                0.467
+              ],
+              "Attack_2": [
+                0.467
+              ],
+              "Attack_3": [
+                0.467
+              ],
+              "Attack_4": [
+                0.433
+              ],
+              "Skill_1_End": [
+                0.067
+              ],
+              "Skill_2": [
+                0.467,
+                0.533,
+                0.6,
+                0.667,
+                0.733,
+                0.8,
+                0.867
+              ]
+            },
+            "bounds": {
+              "x": -149.976,
+              "y": -29.28,
+              "width": 359.376,
+              "height": 2142.65
+            }
+          },
+          "back": {
+            "skel": "spine/op/char_1030_noirc2/back/char_1030_noirc2.skel",
+            "atlas": "spine/op/char_1030_noirc2/back/char_1030_noirc2.atlas",
+            "textures": [
+              "spine/op/char_1030_noirc2/back/char_1030_noirc2.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack_1",
+                "end": null,
+                "via": "attackAny"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_1_Begin",
+                "loop": "Skill_1_Loop",
+                "end": "Skill_1_End",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
+                  "index": 0,
+                  "idle": null
+                },
+                "1": {
+                  "begin": null,
+                  "loop": "Skill_2",
+                  "end": null,
+                  "index": 1,
+                  "idle": null
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Attack_1",
+                  "end": null,
+                  "via": "attack",
+                  "index": 2,
+                  "idle": null
+                }
+              }
+            },
+            "animations": {
+              "Attack_1": 1.2,
+              "Attack_2": 1.2,
+              "Attack_3": 1.2,
+              "Attack_4": 1.2,
+              "Default": 0,
+              "Idle": 1.2,
+              "Skill_1_Begin": 1,
+              "Skill_1_End": 1,
+              "Skill_1_Loop": 1,
+              "Skill_2": 1.4,
+              "Start": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack_1": [
+                0.467
+              ],
+              "Attack_2": [
+                0.467
+              ],
+              "Attack_3": [
+                0.467
+              ],
+              "Attack_4": [
+                0.433
+              ],
+              "Skill_1_End": [
+                0.067
+              ],
+              "Skill_2": [
+                0.467,
+                0.533,
+                0.6,
+                0.667,
+                0.733,
+                0.8,
+                0.867
+              ]
+            },
+            "bounds": {
+              "x": -149.976,
+              "y": -29.28,
+              "width": 359.376,
+              "height": 2142.65
+            }
+          }
+        }
+      },
+      "char_1029_yato2": {
+        "avatar": "char/avatar/char_1029_yato2.png",
+        "avatarE2": "char/avatar/char_1029_yato2.png",
+        "portrait": "char/portrait/char_1029_yato2_1.png",
+        "portraitE2": "char/portrait/char_1029_yato2_2.png",
+        "spine": {
+          "front": {
+            "skel": "spine/op/char_1029_yato2/front/char_1029_yato2.skel",
+            "atlas": "spine/op/char_1029_yato2/front/char_1029_yato2.atlas",
+            "textures": [
+              "spine/op/char_1029_yato2/front/char_1029_yato2.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start_1",
+              "attack": {
+                "begin": null,
+                "loop": "Attack1",
+                "end": null,
+                "via": "attackAny"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill_Attack1",
+                "end": "Skill_End",
+                "index": 0,
+                "idle": "Skill_Idle"
+              },
+              "die": "Die",
+              "move": null,
+              "stun": {
+                "begin": "Stun_Begin",
+                "loop": "Stun",
+                "end": null
+              },
+              "skills": {
+                "0": {
+                  "begin": null,
+                  "loop": "Skill_Attack1",
+                  "end": "Skill_End",
+                  "index": 0,
+                  "idle": "Skill_Idle"
+                },
+                "1": {
+                  "begin": "Skill_2",
+                  "loop": "Skill_2",
+                  "end": null,
+                  "index": 1,
+                  "idle": "Skill_Idle"
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Skill_Attack1",
+                  "end": "Skill_End",
+                  "index": 2,
+                  "idle": "Skill_Idle"
+                }
+              }
+            },
+            "animations": {
+              "Attack1": 1,
+              "Attack2": 1,
+              "Attack3": 1,
+              "Default": 0,
+              "Die": 1,
+              "Idle": 10,
+              "Skill_2": 3.433,
+              "Skill_3_End": 0.667,
+              "Skill_Attack1": 1,
+              "Skill_Attack2": 1,
+              "Skill_Attack3": 1.033,
+              "Skill_Attack4": 1.067,
+              "Skill_End": 0.5,
+              "Skill_Idle": 4,
+              "Start_1": 1,
+              "Start_2": 1,
+              "Start_3": 1,
+              "Stun": 6.233,
+              "Stun_Begin": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack1": [
+                0.5
+              ],
+              "Attack2": [
+                0.5
+              ],
+              "Attack3": [
+                0.5
+              ],
+              "Skill_2": [
+                0.4,
+                1.067,
+                1.133,
+                1.4,
+                1.667,
+                1.933,
+                2,
+                2.2,
+                2.267,
+                2.633,
+                2.7,
+                2.767,
+                2.8,
+                2.867,
+                2.9,
+                2.967
+              ],
+              "Skill_Attack1": [
+                0.4
+              ],
+              "Skill_Attack2": [
+                0.4
+              ],
+              "Skill_Attack3": [
+                0.367,
+                0.633
+              ],
+              "Skill_Attack4": [
+                0.3
+              ]
+            },
+            "bounds": {
+              "x": -348.947,
+              "y": -3.857,
+              "width": 818.053,
+              "height": 646.772
+            }
+          },
+          "back": {
+            "skel": "spine/op/char_1029_yato2/back/char_1029_yato2.skel",
+            "atlas": "spine/op/char_1029_yato2/back/char_1029_yato2.atlas",
+            "textures": [
+              "spine/op/char_1029_yato2/back/char_1029_yato2.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start_1",
+              "attack": {
+                "begin": null,
+                "loop": "Attack1",
+                "end": null,
+                "via": "attackAny"
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Skill_Attack1",
+                "end": "Skill_End",
+                "index": 0,
+                "idle": "Skill_Idle"
+              },
+              "die": null,
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": null,
+                  "loop": "Skill_Attack1",
+                  "end": "Skill_End",
+                  "index": 0,
+                  "idle": "Skill_Idle"
+                },
+                "1": {
+                  "begin": "Skill_2",
+                  "loop": "Skill_2",
+                  "end": null,
+                  "index": 1,
+                  "idle": "Skill_Idle"
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Skill_Attack1",
+                  "end": "Skill_End",
+                  "index": 2,
+                  "idle": "Skill_Idle"
+                }
+              }
+            },
+            "animations": {
+              "Attack1": 1,
+              "Attack2": 1,
+              "Attack3": 1,
+              "Default": 0,
+              "Idle": 10,
+              "Skill_2": 3.433,
+              "Skill_3_End": 0.667,
+              "Skill_Attack1": 1,
+              "Skill_Attack2": 1,
+              "Skill_Attack3": 1.033,
+              "Skill_Attack4": 1.067,
+              "Skill_End": 0.5,
+              "Skill_Idle": 10,
+              "Start_1": 1,
+              "Start_2": 1,
+              "Start_3": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack1": [
+                0.5
+              ],
+              "Attack2": [
+                0.5
+              ],
+              "Attack3": [
+                0.5
+              ],
+              "Skill_2": [
+                0.4,
+                1.067,
+                1.133,
+                1.4,
+                1.667,
+                1.933,
+                2,
+                2.2,
+                2.267,
+                2.633,
+                2.7,
+                2.767,
+                2.8,
+                2.867,
+                2.9,
+                2.967
+              ],
+              "Skill_Attack1": [
+                0.4
+              ],
+              "Skill_Attack2": [
+                0.4
+              ],
+              "Skill_Attack3": [
+                0.367,
+                0.633
+              ],
+              "Skill_Attack4": [
+                0.3
+              ]
+            },
+            "bounds": {
+              "x": -348.947,
+              "y": -3.857,
+              "width": 818.053,
+              "height": 646.772
+            }
+          }
+        }
+      },
+      "char_4203_kichi": {
+        "avatar": "char/avatar/char_4203_kichi.png",
+        "avatarE2": "char/avatar/char_4203_kichi.png",
+        "portrait": "char/portrait/char_4203_kichi_1.png",
+        "portraitE2": "char/portrait/char_4203_kichi_2.png",
+        "spine": {
+          "front": {
+            "skel": "spine/op/char_4203_kichi/front/char_4203_kichi.skel",
+            "atlas": "spine/op/char_4203_kichi/front/char_4203_kichi.atlas",
+            "textures": [
+              "spine/op/char_4203_kichi/front/char_4203_kichi.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": {
+                "begin": null,
+                "loop": "Attack_Down",
+                "end": null
+              },
+              "skill": {
+                "begin": "Skill_1_Begin",
+                "loop": "Skill_1_Loop",
+                "end": "Skill_1_End",
+                "index": 0,
+                "idle": "Skill_1_Idle"
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
+                  "index": 0,
+                  "idle": "Skill_1_Idle"
+                },
+                "1": {
+                  "begin": "Skill_2_Begin",
+                  "loop": "Skill_2_Loop",
+                  "end": "Skill_2_End",
+                  "index": 1,
+                  "idle": "Skill_2_Idle"
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 2,
+                  "idle": null
+                }
+              }
+            },
+            "animations": {
+              "Attack": 2.333,
+              "Attack_Down": 2.333,
+              "Default": 0,
+              "Die": 1,
+              "Idle": 2,
+              "Skill_1_Begin": 0.1,
+              "Skill_1_End": 0.1,
+              "Skill_1_Idle": 2,
+              "Skill_1_Loop": 2.833,
+              "Skill_2_Begin": 0.1,
+              "Skill_2_End": 0.1,
+              "Skill_2_Idle": 2,
+              "Skill_2_Loop": 3,
+              "Skill_Down_1_Loop": 2.833,
+              "Skill_Down_2_Loop": 3,
+              "Start": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnPlayAudio",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack": [
+                0.5
+              ],
+              "Attack_Down": [
+                0.5
+              ],
+              "Skill_1_Loop": [
+                0.5
+              ],
+              "Skill_2_Loop": [
+                0.5
+              ],
+              "Skill_Down_1_Loop": [
+                0.5
+              ],
+              "Skill_Down_2_Loop": [
+                0.5
+              ]
+            },
+            "bounds": {
+              "x": -274.103,
+              "y": -5.216,
+              "width": 675.993,
+              "height": 580.877
+            }
+          },
+          "back": {
+            "skel": "spine/op/char_4203_kichi/back/char_4203_kichi.skel",
+            "atlas": "spine/op/char_4203_kichi/back/char_4203_kichi.atlas",
+            "textures": [
+              "spine/op/char_4203_kichi/back/char_4203_kichi.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": "Skill_1_Begin",
+                "loop": "Skill_1_Loop",
+                "end": "Skill_1_End",
+                "index": 0,
+                "idle": "Skill_1_Idle"
+              },
+              "die": null,
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": "Skill_1_Begin",
+                  "loop": "Skill_1_Loop",
+                  "end": "Skill_1_End",
+                  "index": 0,
+                  "idle": "Skill_1_Idle"
+                },
+                "1": {
+                  "begin": "Skill_2_Begin",
+                  "loop": "Skill_2_Loop",
+                  "end": "Skill_2_End",
+                  "index": 1,
+                  "idle": "Skill_2_Idle"
+                },
+                "2": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 2,
+                  "idle": null
+                }
+              }
+            },
+            "animations": {
+              "Attack": 2.333,
+              "Default": 0,
+              "Idle": 2,
+              "Skill_1_Begin": 0.1,
+              "Skill_1_End": 0.1,
+              "Skill_1_Idle": 2,
+              "Skill_1_Loop": 2.833,
+              "Skill_2_Begin": 0.1,
+              "Skill_2_End": 0.1,
+              "Skill_2_Idle": 2,
+              "Skill_2_Loop": 3,
+              "Start": 1
+            },
+            "events": [
+              "OnAttack",
+              "OnPlayAudio",
+              "OnStart"
+            ],
+            "hits": {
+              "Attack": [
+                0.5
+              ],
+              "Skill_1_Loop": [
+                0.5
+              ],
+              "Skill_2_Loop": [
+                0.5
+              ]
+            },
+            "bounds": {
+              "x": -159.86,
+              "y": -2.846,
+              "width": 561.75,
+              "height": 578.506
+            }
+          }
+        }
+      },
+      "char_475_akafyu": {
+        "avatar": "char/avatar/char_475_akafyu.png",
+        "avatarE2": "char/avatar/char_475_akafyu.png",
+        "portrait": "char/portrait/char_475_akafyu_1.png",
+        "portraitE2": "char/portrait/char_475_akafyu_2.png",
+        "spine": {
+          "front": {
+            "skel": "spine/op/char_475_akafyu/front/char_475_akafyu.skel",
+            "atlas": "spine/op/char_475_akafyu/front/char_475_akafyu.atlas",
+            "textures": [
+              "spine/op/char_475_akafyu/front/char_475_akafyu.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": "Die",
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 0,
+                  "idle": null
+                },
+                "1": {
+                  "begin": "Skill2_Begin",
+                  "loop": "Skill2",
+                  "end": null,
+                  "index": 1,
+                  "idle": "Skill2_Idle"
+                }
+              }
+            }
+          },
+          "back": {
+            "skel": "spine/op/char_475_akafyu/back/char_475_akafyu.skel",
+            "atlas": "spine/op/char_475_akafyu/back/char_475_akafyu.atlas",
+            "textures": [
+              "spine/op/char_475_akafyu/back/char_475_akafyu.png"
+            ],
+            "pma": false,
+            "anims": {
+              "idle": "Idle",
+              "deploy": "Start",
+              "attack": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null
+              },
+              "attackDown": null,
+              "skill": {
+                "begin": null,
+                "loop": "Attack",
+                "end": null,
+                "via": "attack",
+                "index": 0,
+                "idle": null
+              },
+              "die": null,
+              "move": null,
+              "stun": null,
+              "skills": {
+                "0": {
+                  "begin": null,
+                  "loop": "Attack",
+                  "end": null,
+                  "via": "attack",
+                  "index": 0,
+                  "idle": null
+                },
+                "1": {
+                  "begin": "Skill2_Begin",
+                  "loop": "Skill2",
+                  "end": null,
+                  "index": 1,
+                  "idle": "Skill2_Idle"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "skills": {
+      "skchr_yuki_1": "skill/skchr_yuki_1.png",
+      "skchr_yuki_2": "skill/skchr_yuki_2.png",
+      "skchr_noirc2_1": "skill/skchr_noirc2_1.png",
+      "skchr_noirc2_2": "skill/skchr_noirc2_2.png",
+      "skchr_kichi_1": "skill/skchr_kichi_1.png",
+      "skchr_kichi_2": "skill/skchr_kichi_2.png",
+      "skchr_yato2_1": "skill/skchr_yato2_1.png",
+      "skchr_yato2_2": "skill/skchr_yato2_2.png",
+      "skchr_yato2_3": "skill/skchr_yato2_3.png",
+      "skchr_akafuyu_1": "skill/skchr_akafuyu_1.png",
+      "skchr_akafuyu_2": "skill/skchr_akafuyu_2.png"
+    }
+  },
+  "bondIcons": {
+    "dongShip": "bond/dongShip.png"
+  },
+  "notices": {
+    "announcement": "notice/announcement.json",
+    "credits": "notice/credits.json"
+  },
+  "server": {
+    "battle": {
+      "module": "server/battle/dong.mjs"
+    },
+    "modules": [
+      {
+        "id": "dongMatch",
+        "entry": "server/modules/dong.mjs",
+        "uses": [
+          "matchClass"
+        ]
+      }
+    ]
+  },
+  "itemIcons": {
+    "act44side_token_ticket": "item/act44side_token_ticket.png",
+    "act44side_token_ticket_g": "item/act44side_token_ticket_g.png"
+  },
+  "voices": {
+    "char_118_yuki": {
+      "start": [
+        "voice/char_118_yuki/jp/start_1.mp3"
+      ],
+      "faceEnemy": [
+        "voice/char_118_yuki/jp/faceEnemy_1.mp3"
+      ],
+      "select": [
+        "voice/char_118_yuki/jp/select_1.mp3",
+        "voice/char_118_yuki/jp/select_2.mp3"
+      ],
+      "place": [
+        "voice/char_118_yuki/jp/place_1.mp3",
+        "voice/char_118_yuki/jp/place_2.mp3"
+      ],
+      "skill1": [
+        "voice/char_118_yuki/jp/skill1_1.mp3"
+      ],
+      "skill2": [
+        "voice/char_118_yuki/jp/skill2_1.mp3"
+      ],
+      "skill3": [
+        "voice/char_118_yuki/jp/skill3_1.mp3"
+      ],
+      "skill4": [
+        "voice/char_118_yuki/jp/skill4_1.mp3"
+      ],
+      "resultFour": [
+        "voice/char_118_yuki/jp/resultFour_1.mp3"
+      ],
+      "resultThree": [
+        "voice/char_118_yuki/jp/resultThree_1.mp3"
+      ],
+      "resultTwo": [
+        "voice/char_118_yuki/jp/resultTwo_1.mp3"
+      ],
+      "resultLose": [
+        "voice/char_118_yuki/jp/resultLose_1.mp3"
+      ]
+    },
+    "char_4203_kichi": {
+      "start": [
+        "voice/char_4203_kichi/jp/start_1.mp3"
+      ],
+      "faceEnemy": [
+        "voice/char_4203_kichi/jp/faceEnemy_1.mp3"
+      ],
+      "select": [
+        "voice/char_4203_kichi/jp/select_1.mp3",
+        "voice/char_4203_kichi/jp/select_2.mp3"
+      ],
+      "place": [
+        "voice/char_4203_kichi/jp/place_1.mp3",
+        "voice/char_4203_kichi/jp/place_2.mp3"
+      ],
+      "skill1": [
+        "voice/char_4203_kichi/jp/skill1_1.mp3"
+      ],
+      "skill2": [
+        "voice/char_4203_kichi/jp/skill2_1.mp3"
+      ],
+      "skill3": [
+        "voice/char_4203_kichi/jp/skill3_1.mp3"
+      ],
+      "skill4": [
+        "voice/char_4203_kichi/jp/skill4_1.mp3"
+      ],
+      "resultFour": [
+        "voice/char_4203_kichi/jp/resultFour_1.mp3"
+      ],
+      "resultThree": [
+        "voice/char_4203_kichi/jp/resultThree_1.mp3"
+      ],
+      "resultTwo": [
+        "voice/char_4203_kichi/jp/resultTwo_1.mp3"
+      ],
+      "resultLose": [
+        "voice/char_4203_kichi/jp/resultLose_1.mp3"
+      ]
+    },
+    "char_1029_yato2": {
+      "start": [
+        "voice/char_1029_yato2/jp/start_1.mp3"
+      ],
+      "faceEnemy": [
+        "voice/char_1029_yato2/jp/faceEnemy_1.mp3"
+      ],
+      "select": [
+        "voice/char_1029_yato2/jp/select_1.mp3",
+        "voice/char_1029_yato2/jp/select_2.mp3"
+      ],
+      "place": [
+        "voice/char_1029_yato2/jp/place_1.mp3",
+        "voice/char_1029_yato2/jp/place_2.mp3"
+      ],
+      "skill1": [
+        "voice/char_1029_yato2/jp/skill1_1.mp3"
+      ],
+      "skill2": [
+        "voice/char_1029_yato2/jp/skill2_1.mp3"
+      ],
+      "skill3": [
+        "voice/char_1029_yato2/jp/skill3_1.mp3"
+      ],
+      "skill4": [
+        "voice/char_1029_yato2/jp/skill4_1.mp3"
+      ],
+      "resultFour": [
+        "voice/char_1029_yato2/jp/resultFour_1.mp3"
+      ],
+      "resultThree": [
+        "voice/char_1029_yato2/jp/resultThree_1.mp3"
+      ],
+      "resultTwo": [
+        "voice/char_1029_yato2/jp/resultTwo_1.mp3"
+      ],
+      "resultLose": [
+        "voice/char_1029_yato2/jp/resultLose_1.mp3"
+      ]
+    },
+    "char_1030_noirc2": {
+      "start": [
+        "voice/char_1030_noirc2/jp/start_1.mp3"
+      ],
+      "faceEnemy": [
+        "voice/char_1030_noirc2/jp/faceEnemy_1.mp3"
+      ],
+      "select": [
+        "voice/char_1030_noirc2/jp/select_1.mp3",
+        "voice/char_1030_noirc2/jp/select_2.mp3"
+      ],
+      "place": [
+        "voice/char_1030_noirc2/jp/place_1.mp3",
+        "voice/char_1030_noirc2/jp/place_2.mp3"
+      ],
+      "skill1": [
+        "voice/char_1030_noirc2/jp/skill1_1.mp3"
+      ],
+      "skill2": [
+        "voice/char_1030_noirc2/jp/skill2_1.mp3"
+      ],
+      "skill3": [
+        "voice/char_1030_noirc2/jp/skill3_1.mp3"
+      ],
+      "skill4": [
+        "voice/char_1030_noirc2/jp/skill4_1.mp3"
+      ],
+      "resultFour": [
+        "voice/char_1030_noirc2/jp/resultFour_1.mp3"
+      ],
+      "resultThree": [
+        "voice/char_1030_noirc2/jp/resultThree_1.mp3"
+      ],
+      "resultTwo": [
+        "voice/char_1030_noirc2/jp/resultTwo_1.mp3"
+      ],
+      "resultLose": [
+        "voice/char_1030_noirc2/jp/resultLose_1.mp3"
+      ]
+    },
+    "char_475_akafyu": {
+      "start": [
+        "voice/char_475_akafyu/jp/start_1.mp3"
+      ],
+      "faceEnemy": [
+        "voice/char_475_akafyu/jp/faceEnemy_1.mp3"
+      ],
+      "select": [
+        "voice/char_475_akafyu/jp/select_1.mp3",
+        "voice/char_475_akafyu/jp/select_2.mp3"
+      ],
+      "place": [
+        "voice/char_475_akafyu/jp/place_1.mp3",
+        "voice/char_475_akafyu/jp/place_2.mp3"
+      ],
+      "skill1": [
+        "voice/char_475_akafyu/jp/skill1_1.mp3"
+      ],
+      "skill2": [
+        "voice/char_475_akafyu/jp/skill2_1.mp3"
+      ],
+      "skill3": [
+        "voice/char_475_akafyu/jp/skill3_1.mp3"
+      ],
+      "skill4": [
+        "voice/char_475_akafyu/jp/skill4_1.mp3"
+      ],
+      "resultFour": [
+        "voice/char_475_akafyu/jp/resultFour_1.mp3"
+      ],
+      "resultThree": [
+        "voice/char_475_akafyu/jp/resultThree_1.mp3"
+      ],
+      "resultTwo": [
+        "voice/char_475_akafyu/jp/resultTwo_1.mp3"
+      ],
+      "resultLose": [
+        "voice/char_475_akafyu/jp/resultLose_1.mp3"
+      ]
+    }
+  },
+  "voiceLangs": {
+    "cn": {
+      "char_118_yuki": {
+        "start": [
+          "voice/char_118_yuki/cn/start_1.mp3"
+        ],
+        "faceEnemy": [
+          "voice/char_118_yuki/cn/faceEnemy_1.mp3"
+        ],
+        "select": [
+          "voice/char_118_yuki/cn/select_1.mp3",
+          "voice/char_118_yuki/cn/select_2.mp3"
+        ],
+        "place": [
+          "voice/char_118_yuki/cn/place_1.mp3",
+          "voice/char_118_yuki/cn/place_2.mp3"
+        ],
+        "skill1": [
+          "voice/char_118_yuki/cn/skill1_1.mp3"
+        ],
+        "skill2": [
+          "voice/char_118_yuki/cn/skill2_1.mp3"
+        ],
+        "skill3": [
+          "voice/char_118_yuki/cn/skill3_1.mp3"
+        ],
+        "skill4": [
+          "voice/char_118_yuki/cn/skill4_1.mp3"
+        ],
+        "resultFour": [
+          "voice/char_118_yuki/cn/resultFour_1.mp3"
+        ],
+        "resultThree": [
+          "voice/char_118_yuki/cn/resultThree_1.mp3"
+        ],
+        "resultTwo": [
+          "voice/char_118_yuki/cn/resultTwo_1.mp3"
+        ],
+        "resultLose": [
+          "voice/char_118_yuki/cn/resultLose_1.mp3"
+        ]
+      },
+      "char_4203_kichi": {
+        "start": [
+          "voice/char_4203_kichi/cn/start_1.mp3"
+        ],
+        "faceEnemy": [
+          "voice/char_4203_kichi/cn/faceEnemy_1.mp3"
+        ],
+        "select": [
+          "voice/char_4203_kichi/cn/select_1.mp3",
+          "voice/char_4203_kichi/cn/select_2.mp3"
+        ],
+        "place": [
+          "voice/char_4203_kichi/cn/place_1.mp3",
+          "voice/char_4203_kichi/cn/place_2.mp3"
+        ],
+        "skill1": [
+          "voice/char_4203_kichi/cn/skill1_1.mp3"
+        ],
+        "skill2": [
+          "voice/char_4203_kichi/cn/skill2_1.mp3"
+        ],
+        "skill3": [
+          "voice/char_4203_kichi/cn/skill3_1.mp3"
+        ],
+        "skill4": [
+          "voice/char_4203_kichi/cn/skill4_1.mp3"
+        ],
+        "resultFour": [
+          "voice/char_4203_kichi/cn/resultFour_1.mp3"
+        ],
+        "resultThree": [
+          "voice/char_4203_kichi/cn/resultThree_1.mp3"
+        ],
+        "resultTwo": [
+          "voice/char_4203_kichi/cn/resultTwo_1.mp3"
+        ],
+        "resultLose": [
+          "voice/char_4203_kichi/cn/resultLose_1.mp3"
+        ]
+      },
+      "char_1029_yato2": {
+        "start": [
+          "voice/char_1029_yato2/cn/start_1.mp3"
+        ],
+        "faceEnemy": [
+          "voice/char_1029_yato2/cn/faceEnemy_1.mp3"
+        ],
+        "select": [
+          "voice/char_1029_yato2/cn/select_1.mp3",
+          "voice/char_1029_yato2/cn/select_2.mp3"
+        ],
+        "place": [
+          "voice/char_1029_yato2/cn/place_1.mp3",
+          "voice/char_1029_yato2/cn/place_2.mp3"
+        ],
+        "skill1": [
+          "voice/char_1029_yato2/cn/skill1_1.mp3"
+        ],
+        "skill2": [
+          "voice/char_1029_yato2/cn/skill2_1.mp3"
+        ],
+        "skill3": [
+          "voice/char_1029_yato2/cn/skill3_1.mp3"
+        ],
+        "skill4": [
+          "voice/char_1029_yato2/cn/skill4_1.mp3"
+        ],
+        "resultFour": [
+          "voice/char_1029_yato2/cn/resultFour_1.mp3"
+        ],
+        "resultThree": [
+          "voice/char_1029_yato2/cn/resultThree_1.mp3"
+        ],
+        "resultTwo": [
+          "voice/char_1029_yato2/cn/resultTwo_1.mp3"
+        ],
+        "resultLose": [
+          "voice/char_1029_yato2/cn/resultLose_1.mp3"
+        ]
+      },
+      "char_1030_noirc2": {
+        "start": [
+          "voice/char_1030_noirc2/cn/start_1.mp3"
+        ],
+        "faceEnemy": [
+          "voice/char_1030_noirc2/cn/faceEnemy_1.mp3"
+        ],
+        "select": [
+          "voice/char_1030_noirc2/cn/select_1.mp3",
+          "voice/char_1030_noirc2/cn/select_2.mp3"
+        ],
+        "place": [
+          "voice/char_1030_noirc2/cn/place_1.mp3",
+          "voice/char_1030_noirc2/cn/place_2.mp3"
+        ],
+        "skill1": [
+          "voice/char_1030_noirc2/cn/skill1_1.mp3"
+        ],
+        "skill2": [
+          "voice/char_1030_noirc2/cn/skill2_1.mp3"
+        ],
+        "skill3": [
+          "voice/char_1030_noirc2/cn/skill3_1.mp3"
+        ],
+        "skill4": [
+          "voice/char_1030_noirc2/cn/skill4_1.mp3"
+        ],
+        "resultFour": [
+          "voice/char_1030_noirc2/cn/resultFour_1.mp3"
+        ],
+        "resultThree": [
+          "voice/char_1030_noirc2/cn/resultThree_1.mp3"
+        ],
+        "resultTwo": [
+          "voice/char_1030_noirc2/cn/resultTwo_1.mp3"
+        ],
+        "resultLose": [
+          "voice/char_1030_noirc2/cn/resultLose_1.mp3"
+        ]
+      },
+      "char_475_akafyu": {
+        "start": [
+          "voice/char_475_akafyu/cn/start_1.mp3"
+        ],
+        "faceEnemy": [
+          "voice/char_475_akafyu/cn/faceEnemy_1.mp3"
+        ],
+        "select": [
+          "voice/char_475_akafyu/cn/select_1.mp3",
+          "voice/char_475_akafyu/cn/select_2.mp3"
+        ],
+        "place": [
+          "voice/char_475_akafyu/cn/place_1.mp3",
+          "voice/char_475_akafyu/cn/place_2.mp3"
+        ],
+        "skill1": [
+          "voice/char_475_akafyu/cn/skill1_1.mp3"
+        ],
+        "skill2": [
+          "voice/char_475_akafyu/cn/skill2_1.mp3"
+        ],
+        "skill3": [
+          "voice/char_475_akafyu/cn/skill3_1.mp3"
+        ],
+        "skill4": [
+          "voice/char_475_akafyu/cn/skill4_1.mp3"
+        ],
+        "resultFour": [
+          "voice/char_475_akafyu/cn/resultFour_1.mp3"
+        ],
+        "resultThree": [
+          "voice/char_475_akafyu/cn/resultThree_1.mp3"
+        ],
+        "resultTwo": [
+          "voice/char_475_akafyu/cn/resultTwo_1.mp3"
+        ],
+        "resultLose": [
+          "voice/char_475_akafyu/cn/resultLose_1.mp3"
+        ]
+      }
+    }
+  }
+}

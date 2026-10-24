@@ -158,10 +158,9 @@ const ICE_TOKENS = new Set(['token_10058_sbell2_icetgt']);
  */
 const NO_HP_BAR = new Set(['token_10031_swire2_gdtrap']);
 const ICE_FRAME = 0x9fe6ff;
-/** Equipped-item pips drawn under a board unit: the official 2 plus the most a `params.slot_cap` carrier can reach
- * (源石辅助仪 进阶 +4 ⇒ 6, shared/equipSlots.js). Laid out in rows of `ITEM_PIP_COLS`. */
+/** Equipment indicators drawn in the main-server HUD track: the official 2 plus the most a `params.slot_cap` carrier
+ * can reach (源石辅助仪 进阶 +4 ⇒ 6, shared/equipSlots.js). */
 const MAX_ITEM_PIPS = 6;
-const ITEM_PIP_COLS = 3;
 /** How long a view waits for its avatar before showing the image-less placeholder diamond. */
 const PIC_WAIT_MS = 400;
 /**
@@ -1109,7 +1108,18 @@ export class UnitView {
     this.ctx.layers.groundFx.addChild(this.blockIcon);
     this.countText = null;
     this.ammoText = null;          // 设置「弹药数量」: the magazine's count under the ammo bar (_updateAmmoCount)
-    this.itemPips = [];
+    this.equipTrack = new P.Graphics();
+    h.addChild(this.equipTrack);
+    this.equipSlots = Array.from({ length: MAX_ITEM_PIPS }, () => {
+      const slot = new P.Graphics();
+      h.addChild(slot);
+      slot.visible = false;
+      return slot;
+    });
+    this.equipTrack.visible = false;
+    this.equipItems = [];
+    this.equipCount = 0;
+    this._equipLayoutKey = '';
   }
 
   /** Show a stack count (token stacks in the hand) — BitmapText-free: a tiny canvas-less chip via Text. */
@@ -1125,21 +1135,16 @@ export class UnitView {
     this.countText.visible = true;
   }
 
-  /** Equipped item pips (prep): list of item icon URLs. The official cap is 2, but a carrier can raise it with
-   * `params.slot_cap` (源石辅助仪 +2 / 进阶 +4 ⇒ up to 6, shared/equipSlots.js), so show up to that many. */
-  setItems(urls) {
-    const P = this.P;
-    const list = Array.isArray(urls) ? urls.slice(0, MAX_ITEM_PIPS) : [];
-    while (this.itemPips.length > list.length) this.itemPips.pop().destroy();
-    list.forEach((u, i) => {
-      let s = this.itemPips[i];
-      if (!s) { s = new P.Sprite(P.Texture.EMPTY); s.anchor.set(0.5); this.hud.addChild(s); this.itemPips[i] = s; }
-      if (s._url === u) return;
-      s._url = u;
-      const a = this.ctx.assets;
-      s.texture = itemTexture(u || 'none', null, 0x4ed8af);
-      if (u && a?.image) a.image(u).then((img) => { if (!s.destroyed && s._url === u) s.texture = itemTexture(u, img, 0x4ed8af); }, () => {});
-    });
+  /** Equipped items in the main-server HUD track. The track keeps the main-server two-slot layout and divides the
+   * same width into up to six segments when a DLC raises `params.slot_cap`. Golden equipment gets the amber segment. */
+  setItems(entries) {
+    const list = Array.isArray(entries) ? entries.slice(0, MAX_ITEM_PIPS).map((entry) => (
+      entry && typeof entry === 'object'
+        ? { url: entry.url || null, golden: !!entry.golden }
+        : { url: entry || null, golden: false }
+    )) : [];
+    this.equipItems = list;
+    this.equipCount = list.length;
   }
 
   // ---- state input ---------------------------------------------------------------------------------------
@@ -1876,6 +1881,33 @@ export class UnitView {
       if (prep) this.chip.position.set(x, y - this.chip.height / 2 + 2);
       else this.chip.position.set(x0 - this.chip.width / 2 - 1, cy + (showSp ? spH / 2 : 0));
     }
+    // Main-server equipment UI: a slim segmented rail under the operator's tier chip during preparation. DLC slot
+    // expansion keeps that rail and splits it into more segments instead of placing large item pictures on the unit.
+    const showEquip = prep && this.alive && !!this.chip && this.equipCount > 0;
+    this.equipTrack.visible = showEquip;
+    if (showEquip) {
+      const trackX = x - bw / 2 + 1;
+      const count = Math.min(MAX_ITEM_PIPS, this.equipCount);
+      const gap = count === 2 ? 2 : 1;
+      const inset = 3;
+      const slotW = Math.max(1, (bw - inset * 2 - gap * (count - 1)) / count);
+      this.equipTrack.position.set(trackX, y - 4);
+      const layoutKey = `${Math.round(bw * 100)}/${count}`;
+      if (this._equipLayoutKey !== layoutKey) {
+        this._equipLayoutKey = layoutKey;
+        this.equipTrack.clear().lineStyle(1, 0xd3d9d7, 0.9).beginFill(0x111514, 0.96).drawRoundedRect(0, -4, bw, 8, 4).endFill();
+        for (const slot of this.equipSlots) slot.clear().beginFill(0xffffff).drawRoundedRect(0, -1.5, slotW, 3, Math.min(1.5, slotW / 2)).endFill();
+      }
+      for (let i = 0; i < this.equipSlots.length; i++) {
+        const slot = this.equipSlots[i];
+        slot.visible = i < count;
+        if (!slot.visible) continue;
+        slot.tint = this.equipItems[i]?.golden ? 0xffcf45 : 0xe4e8e6;
+        slot.position.set(trackX + inset + i * (slotW + gap), y - 4);
+      }
+    } else {
+      for (const slot of this.equipSlots) slot.visible = false;
+    }
     // status icons row above the bars
     const icons = this._iconKeys();
     const isz = clamp(s * 0.26, 12, 26);
@@ -1911,30 +1943,10 @@ export class UnitView {
       this.blockIcon.scale.set(clamp(s * 0.22, 9, 22) / 32 * (this.visFacing < 0 ? -1 : 1), clamp(s * 0.22, 9, 22) / 32);
       this.blockIcon.alpha = 0.85 * alpha;
     }
-    // count badge & item pips (prep)
+    // count badge (prep)
     if (this.countText && this.countText.visible) {
       this.countText.scale.set(clamp(s / 90, 0.5, 1.2));
       this.countText.position.set(x + s * 0.32, this.screen.y - s * 0.12);
-    }
-    // ≤ 2 pips keep the official single left-anchored row; a slot_cap carrier (3–6) wraps into centered rows of 3
-    const nPips = this.itemPips.length;
-    if (nPips) {
-      const ps = clamp(s * (nPips > ITEM_PIP_COLS ? 0.22 : 0.26), 12, 30);
-      const step = ps + 1;
-      const baseY = this.screen.y - s * 0.05;
-      for (let i = 0; i < nPips; i++) {
-        const pip = this.itemPips[i];
-        pip.width = pip.height = ps;
-        if (nPips <= ITEM_PIP_COLS) {
-          pip.position.set(this.screen.x - s * 0.36 + i * step, baseY);
-        } else {
-          const row = Math.floor(i / ITEM_PIP_COLS), col = i % ITEM_PIP_COLS;
-          const inRow = Math.min(ITEM_PIP_COLS, nPips - row * ITEM_PIP_COLS);
-          const rowX = this.screen.x - (inRow * step - 1) / 2;
-          pip.position.set(rowX + col * step + ps / 2, baseY - row * step);
-        }
-        pip.visible = this.alive;
-      }
     }
   }
 

@@ -175,6 +175,7 @@ function SectionEnemy() {
 
 function SectionOp() {
   const [pick, setPick] = useState(null);
+  const [form, setForm] = useState('normal');
   const [q, setQ] = useState('');
   const [atk, setAtk] = useState('');
   const [def, setDef] = useState('');
@@ -186,6 +187,8 @@ function SectionOp() {
   const chess = table('chess').filter((c) => !c.isGolden).sort((a, b) => (a.tier | 0) - (b.tier | 0) || String(a.chessId).localeCompare(String(b.chessId)))
     .filter((c) => matches(q, c.name, c.chessId, c.charId));
   const rec = pick ? data.lookup('chess', pick) : null;
+  const eliteId = rec && typeof rec.goldenId === 'string' && data.lookup('chess', rec.goldenId) ? rec.goldenId : null;
+  const grantId = form === 'elite' && eliteId ? eliteId : pick;
   const overrides = () => {
     const o = {};
     const put = (k, v) => { if (v !== '' && Number.isFinite(+v) && +v !== 0) o[k] = +v; };
@@ -196,13 +199,17 @@ function SectionOp() {
     <${SearchBox} value=${q} onChange=${setQ} />
     ${chess.length ? html`<div class="devpanel__grid devpanel__grid--op">
       ${chess.map((c) => html`<button key=${c.chessId} type="button" class=${`devpanel__cell${pick === c.chessId ? ' is-on' : ''}`}
-          title=${c.name || c.chessId} onClick=${() => setPick(c.chessId)}>
+          title=${c.name || c.chessId} onClick=${() => { setPick(c.chessId); setForm('normal'); }}>
         <${UnitThumb} kind="chess" id=${c.chessId} size="sm" /><span>${c.name || c.chessId}</span>
       </button>`)}
     </div>` : html`<p class="devpanel__tip">${t('没有匹配的项')}</p>`}
     ${rec ? html`<div class="devpanel__detail">
       <div class="devpanel__detail-head"><b>${rec.name || pick}</b><button type="button" class="devpanel__close" onClick=${() => setPick(null)} aria-label=${t('收起')}><${Icon} name="close" /></button></div>
-      <span class="devpanel__id">${pick}</span>
+      <span class="devpanel__id">${grantId}</span>
+      <div class="devpanel__variant" role="group" aria-label=${t('数值版本')}>
+        <button type="button" class=${`devpanel__go${form === 'normal' ? ' is-on' : ''}`} onClick=${() => setForm('normal')}>${t('普通')}</button>
+        <button type="button" class=${`devpanel__go${form === 'elite' ? ' is-on' : ''}`} disabled=${!eliteId} onClick=${() => setForm('elite')}>${t('精锐')}</button>
+      </div>
       <p class="devpanel__tip">${t('比例：0.5 = +50%；点数：直接加减')}</p>
       <div class="devpanel__form">
         <${NumRow} label=${t('攻击力')} hint=${t('比例')} value=${atk} onChange=${setAtk} />
@@ -214,7 +221,7 @@ function SectionOp() {
         <${NumRow} label=${t('阻挡数')} hint=${t('点数')} value=${block} onChange=${setBlock} />
       </div>
       <button type="button" class="devpanel__go devpanel__go--wide"
-        onClick=${() => dev('grantChess', { chessId: pick, ...(overrides() ? { overrides: overrides() } : {}) })}>
+        onClick=${() => dev('grantChess', { chessId: grantId, ...(overrides() ? { overrides: overrides() } : {}) })}>
         ${t('添加至待部署区')}
       </button>
     </div>` : html`<p class="devpanel__tip">${t('选一个干员查看 / 修改它的数值')}</p>`}
@@ -288,7 +295,7 @@ function SectionScene({ cur, armed, bossCur }) {
 /** 局内开发者面板：收起态是一个左侧把手，点开占左栏。 */
 export function DevPanel() {
   const [open, setOpen] = useState(false);
-  const [section, setSection] = useState('band');
+  const [section, setSection] = useState('op');
   const dev = useStore((s) => !!s.match.public?.dev);
   const curStage = useStore((s) => s.match.public?.stageId || null);
   const armedKind = useStore((s) => s.match.public?.devNextKind || null);

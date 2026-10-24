@@ -185,6 +185,7 @@ import { DIFFICULTIES, ERR, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkConflictPicks, checkDiyPicks, charPotentialChanges, PACK_MSG_LIMITS, CHAT_LIMITS } from '../shared/protocol.js';
 import { modSetOf, isModId, modSetDrift } from '../shared/modIdentity.js';
 import { DLC_IDS, basePackIds, enabledDlcIds, selectableDlcIds } from '../shared/dlc.js';
+import { contractsValidFor, resolvePicked, contractPoints, contractsAllowedAt } from '../shared/contracts.js';
 import { normalizeSupportConfig, checkSupport, supportPicker, supportCapacity, supportTiers } from '../shared/support.js';
 import { checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
@@ -195,6 +196,7 @@ import { buildRoomRegistry } from './match/metaPack.js';
 // 这里只做**装配** —— 房间建起来时装一次、每个生命周期点触发一次。没有包声明 `server.room` 时 `install` 与 `fire`
 // 都是一次早退（`byRoom` 里没有条目），所以干净安装与从前逐字节相同。
 import { createRoomHooks, holdDecision, releaseRoomHolds } from './roomPack.js';
+import { isAvailableAvatar } from './avatarCatalog.js';
 import { getDefaultRegistry } from './match/effectsMeta.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
 import { MatchmakeQueue } from './matchmaking.js';
@@ -448,12 +450,14 @@ export class Room {
     this.recruitWanted = true;
     this.dlcAvailable = null;
     this.dlcIds = [];
+    this.contracts = [];
     this.inviteOnly = false;
     this.invited = new Set();
     this.extendedUnite = mode === 'coop' && seatCap > DEFAULT_SEATS;
     this.uniteRotation = true;
     this.uniteHumanFirst = true;
-    this.uniteHelpers = 2;
+    // null = follow the current occupied-seat limit; an explicit number is a host override.
+    this.uniteHelpers = null;
     /**
      * 本房间的 Fever 音乐（颂乐人偶 mod，`room.feverMusic`）：`{ track, start, end }`，`track` 是
      * `GET /api/music` 的曲目 id；`null` = 包内默认两首。房主、开局前可改，变更即写进 `room.state` 广播给全员。
@@ -590,6 +594,13 @@ export class Room {
     return this.seatCap;
   }
 
+  /** Default to the largest legal helper count for the players currently seated. */
+  effectiveUniteHelpers() {
+    if (!this.extendedUnite) return 2;
+    const limit = uniteLimitOf(this.occupiedSeats().length);
+    return this.uniteHelpers == null ? limit : Math.min(this.uniteHelpers, limit);
+  }
+
   /**
    * `room.state` frame (DESIGN §8.1) plus `inMatch`, plus the room's own `mods` when it declared a set (W-A,
    * DESIGN §28.9). `mods` has the SAME shape as `welcome.mods` (`{ digest, packs }`, packs sorted by id) and is
@@ -605,6 +616,10 @@ export class Room {
       hostId: this.hostId,
       mode: this.mode,
       difficulty: this.difficulty,
+      ...(this.contracts.length ? {
+        contracts: [...this.contracts],
+        contractPoints: contractPoints(this.contracts, this.difficulty),
+      } : {}),
       maxSeats: this.seats.length,
       aiPicksLast: this.aiPicksLast,
       aiBands: { ...this.aiBands },
@@ -614,7 +629,8 @@ export class Room {
       extendedUnite: this.extendedUnite,
       uniteRotation: this.uniteRotation,
       uniteHumanFirst: this.uniteHumanFirst,
-      uniteHelpers: this.uniteHelpers,
+      uniteHelpers: this.effectiveUniteHelpers(),
+      uniteHelpersAuto: this.uniteHelpers == null,
       // 房内聊天模式：客户端据此决定要不要显示输入框。**服务端强制**（`chat` / `quickMsg` 各自再判一次），
       // 这个字段只是让界面说实话。
       chatMode: this.chatMode,
@@ -642,6 +658,7 @@ export class Room {
         : null)),
       spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(this.modded ? { content: s.content || 'loading' } : {}) })),
       ...(this.modSet ? { mods: this.modSet } : {}),
+      ...(this.dlcAvailable ? { roomData: true } : {}),
       ...(this.dlcAvailable ? { dlc: { available: this.dlcAvailable, enabled: selectableDlcIds(this.dlcIds) } } : {}),
       // 房间的 Fever 音乐（颂乐人偶）：没设过就不带这个键 —— 与从前逐字节相同。
       ...(this.feverMusic ? { feverMusic: this.feverMusic } : {}),
@@ -1213,6 +1230,7 @@ export class Lobby {  /**
       case 'room.mods':
         return fail(ERR.MOD_SET_LOCKED, 'this server runs a fixed mod set; rooms cannot change it');
       case 'room.setDlc': return this.setRoomDlc(session, msg);
+      case 'room.setContracts': return this.setContracts(session, msg);
       case 'room.feverMusic': return this.setFeverMusic(session, msg);
       case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
@@ -1814,11 +1832,12 @@ export class Lobby {  /**
     const lastOccupied = seats.reduce((acc, s, i) => (s ? i : acc), -1);
     if (n <= lastOccupied) return fail(ERR.BAD_TARGET, 'seats are occupied');
     if (room.seatCapTo(n) !== n) return fail(ERR.BAD_TARGET, 'seats are occupied');
+    room.contracts = resolvePicked(room.contracts, n, room.difficulty);
     // 2026-10-20 a5：人数一改，扩展联防的默认值跟着人数走（4 人关、超过 4 人开；房主之后仍可手动改）
     const uniteDefault = n > DEFAULT_SEATS;
     if (room.extendedUnite !== uniteDefault) {
       room.extendedUnite = uniteDefault;
-      if (!uniteDefault) room.uniteHelpers = 2;
+      if (!uniteDefault) room.uniteHelpers = null;
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
     }
     this.broadcastState(room);
@@ -1834,6 +1853,8 @@ export class Lobby {  /**
     // a plugin mode chosen (header "Gameplay plugins") carries its own difficulty: picking one leaves it
     if (room.difficulty !== difficulty || room.content?.modeId) {
       room.difficulty = difficulty;
+      room.contracts = contractsAllowedAt(difficulty)
+        ? resolvePicked(room.contracts, room.seatCap, difficulty) : [];
       if (room.content?.modeId) { const rest = { ...room.content }; delete rest.modeId; room.content = Object.freeze(rest); }
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
@@ -1883,10 +1904,11 @@ export class Lobby {  /**
     const uniteDefault = seatCap > DEFAULT_SEATS;
     if (room.extendedUnite !== uniteDefault) {
       room.extendedUnite = uniteDefault;
-      if (!uniteDefault) room.uniteHelpers = 2;
+      if (!uniteDefault) room.uniteHelpers = null;
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
     }
     this.log.info(`[lobby] ${room.code} seat cap set to ${seatCap} by ${session.name}`);
+    room.contracts = resolvePicked(room.contracts, seatCap, room.difficulty);
     this.broadcastState(room);
     return OK;
   }
@@ -1902,7 +1924,7 @@ export class Lobby {  /**
     this.dropReplay(room, session.playerId);
     if (room.extendedUnite !== on) {
       room.extendedUnite = on;
-      if (!on) room.uniteHelpers = 2;
+      if (!on) room.uniteHelpers = null;
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
     }
@@ -1933,14 +1955,14 @@ export class Lobby {  /**
     return OK;
   }
 
-  /** B：协防人数（偶数 2..limit）。 */
+  /** B：协防人数（null = 自动上限，或偶数 2..limit）。 */
   setUniteHelpers(session, { n }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.mode !== 'coop' || !room.extendedUnite) return fail(ERR.BAD_TARGET, 'extended unite is off');
-    if (!Number.isInteger(n) || n < 2 || n % 2 !== 0 || n > uniteLimitOf(room.seats.filter(Boolean).length)) return fail(ERR.BAD_TARGET);
+    if (n !== null && (!Number.isInteger(n) || n < 2 || n % 2 !== 0 || n > uniteLimitOf(room.occupiedSeats().length))) return fail(ERR.BAD_TARGET);
     this.dropReplay(room, session.playerId);
     if (room.uniteHelpers !== n) { room.uniteHelpers = n; this.broadcastState(room); }
     return OK;
@@ -2017,6 +2039,27 @@ export class Lobby {  /**
    * @param {import('./net.js').Session} session
    * @param {{ modIds: string[] }} msg
    */
+  setContracts(session, { contracts }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    // 危机合约：同盟与独立模拟都可以启用（重构模拟按多人分队处理，不提供合约）。
+    if (room.mode !== 'coop' && room.mode !== 'solo') return fail(ERR.BAD_TARGET, 'contracts require a co-op or solo room');
+    if (!Array.isArray(contracts) || contracts.length > 64 || new Set(contracts).size !== contracts.length) return fail(ERR.BAD_MSG, 'invalid contract list');
+    if (contracts.length && !contractsAllowedAt(room.difficulty)) return fail(ERR.BAD_MSG, 'contracts require hard difficulty');
+    const check = contractsValidFor(contracts, { players: room.seatCap, difficulty: room.difficulty });
+    if (!check.ok) return fail(ERR.BAD_MSG, `${check.reason}: ${check.bad}`);
+    const next = resolvePicked(contracts, room.seatCap, room.difficulty);
+    if (next.length !== contracts.length || next.some((id, i) => id !== contracts[i])) return fail(ERR.BAD_MSG, 'conflicting contracts');
+    if (next.join(',') === room.contracts.join(',')) return OK;
+    this.dropReplay(room, session.playerId);
+    room.contracts = next;
+    for (const seat of room.seats) if (seat && !seat.isBot && seat.playerId !== room.hostId) seat.ready = false;
+    this.broadcastState(room);
+    return OK;
+  }
+
   setRoomDlc(session, { id, on }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -2917,7 +2960,7 @@ export class Lobby {  /**
     // W-B：房间声明了集合时，只有**它声明的那几个包**的 meta 模块参与装配（声明了才算数）。
     const roomIds = room.modSet && Array.isArray(room.modSet.packs) ? new Set(room.modSet.packs.map((p) => p && p.id)) : null;
     const metaModules = (this.workshop && Array.isArray(this.workshop.meta) ? this.workshop.meta : [])
-      .filter((m) => !roomIds || (m && roomIds.has(m.pack)));
+      .filter((m) => !roomIds || (m && roomIds.has(m.id)));
     // 包声明的**战斗逻辑**（`server.battle`, DESIGN §28.17）：与 meta 同一条口径 —— 房间声明了集合时只有它点名的包参与。
     // installer（真函数，服务端跑）与 modules（JSON 安全的 URL 清单，进 BattleSpec 让浏览器加载同一段代码）两份都过滤。
     const battleInstallers = (this.workshop && Array.isArray(this.workshop.battleInstallers) ? this.workshop.battleInstallers : [])
@@ -2946,6 +2989,7 @@ export class Lobby {  /**
         roomCode: room.code,
         mode: room.mode,
         difficulty: room.difficulty,
+        ...(room.contracts.length ? { contracts: [...room.contracts] } : {}),
         modeId: room.content?.modeId || modeIdFor(room.mode, room.difficulty),
         // 开发者模式（「全量模拟」）：`dev` 跳过 INFO_CHECK / BAND_DRAFT，`devStage` 强制这一局打那张图
         dev: room.dev === true,
@@ -2956,7 +3000,7 @@ export class Lobby {  /**
         uniteRotation: room.mode === 'coop' && room.extendedUnite === true && room.uniteRotation === true,
         uniteHumanFirst: room.mode === 'coop' && room.extendedUnite === true && room.uniteHumanFirst === true,
         uniteHelpers: room.mode === 'coop' && room.extendedUnite === true
-          ? Math.min(room.uniteHelpers, uniteLimitOf(seats.length)) : 2,
+          ? room.effectiveUniteHelpers() : 2,
         seats,
         // the spectator seats (header): watched like eliminated players, never players
         spectators: room.spectators.map((s) => s.playerId),
@@ -2995,6 +3039,9 @@ export class Lobby {  /**
         // …and the identity of that content, which every BattleSpec of this match carries (DESIGN §28.2). The room's own
         // set when it declared one — that IS what this match runs — else the process set, byte for byte as before.
         mods: room.modSet || this.modSet,
+        // This deployment keeps /data on the permanent packs. Even when all installed DLCs are selected and the room
+        // digest equals welcome.mods, clients must load the materialised /room-data/<digest>/ face.
+        ...(room.dlcAvailable ? { roomData: true } : {}),
         // 包声明的**战斗逻辑**（`server.battle`, DESIGN §28.17）：两个字段都只在真的有包声明时出现 —— 干净安装
         // （或一个都没点名的房间）送进去的 opts 与从前逐字节相同，`Battle` 也拿不到 `battleInstallers` 这个键。
         ...(battleInstallers.length ? { battleInstallers } : {}),

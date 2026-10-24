@@ -13,6 +13,7 @@ import { DELAYS } from './common.js';
 import { battleOptsFromMatch } from './battleOpts.js';
 import { previewPlayer } from '../preview.js';
 import { morphBattleOpt } from '../../../shared/plugins/rules.js';
+import { bossRoundMods } from '../../../shared/contractEffects.js';
 
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
@@ -44,6 +45,33 @@ export class MatchCombat {
     for (const s of Array.isArray(list) ? list : []) {
       if (!s || typeof s !== 'object' || typeof s.enemyKey !== 'string' || !this.gd.enemy(s.enemyKey)) continue;
       const spec = { ...s, mods: s.mods && typeof s.mods === 'object' ? { ...s.mods } : {} };
+      const rank = String(this.gd.enemy(spec.enemyKey)?.rank || 'NORMAL').toUpperCase();
+      if (rank === 'ELITE' || rank === 'BOSS') {
+        for (const [field, key] of [['hpMul', 'hp'], ['atkMul', 'atk'], ['defMul', 'def'], ['speedMul', 'speed']]) {
+          const mul = this.contractFx?.enemyMul(rank, key) ?? 1;
+          if (mul !== 1) spec.mods[field] = (Number.isFinite(spec.mods[field]) ? spec.mods[field] : 1) * mul;
+        }
+        if (rank === 'ELITE' && this.contractFx?.eliteBlockAdd) {
+          spec.mods.contractBlockAdd = this.contractFx.eliteBlockAdd;
+          spec.mods.contractBlockMax = this.contractFx.eliteBlockMax ?? 3;
+        }
+      }
+      if (this.contractFx?.pact && rank === 'NORMAL') {
+        const pact = this.contractFx.pact;
+        if (pact.lateHpFrom && this.round >= pact.lateHpFrom) {
+          const steps = this.round - pact.lateHpFrom + 1;
+          spec.mods.hpMul = (spec.mods.hpMul ?? 1) * Math.pow(1 + pact.lateHpStep, steps);
+          for (const key of ['atkMul', 'defMul']) spec.mods[key] = (spec.mods[key] ?? 1) * Math.pow(1 + pact.lateStatStep, steps);
+        }
+      }
+      if (rank === 'BOSS' && this.contractFx?.pact) {
+        const pact = this.contractFx.pact;
+        const mods = this.round === this.gd.hiddenRound
+          ? { atkAdd: pact.hiddenStatAdd, defAdd: pact.hiddenStatAdd }
+          : bossRoundMods(this.contractFx, this.round);
+        spec.mods.atkMul = (spec.mods.atkMul ?? 1) * Math.max(0.1, 1 + mods.atkAdd);
+        spec.mods.defMul = (spec.mods.defMul ?? 1) * Math.max(0.1, 1 + mods.defAdd);
+      }
       if (ownerPlayerId && spec.ownerPlayerId == null) spec.ownerPlayerId = ownerPlayerId;
       const coins = spec.bounty && typeof spec.bounty === 'object' ? Math.trunc(Number(spec.bounty.coins) || 0) : 0;
       if (coins > 0 && spec.mods.bountyId == null && spec.mods.bountyCoins == null) spec.mods.bountyCoins = coins;

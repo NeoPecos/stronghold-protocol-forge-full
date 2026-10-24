@@ -159,6 +159,7 @@ export class Battle {
     this.routes = (opts.routes ?? []).map((r) => normalizeRoute(r));
     /** Per-template enemy overrides `{ [enemyKey]: { stats: {…partial} } }` (waves.json `overrides`). */
     this.enemyOverrides = opts.enemyOverrides ?? {};
+    this.contractMods = opts.contractMods || null;
     this.dt = TICK;
     this.time = 0;
     this.tickCount = 0;

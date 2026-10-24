@@ -82,6 +82,7 @@ export function buildBattleSpec(o = {}) {
     routes: Array.isArray(o.routes) ? o.routes : [],
     flags: o.flags ?? {},
     enemyOverrides: o.enemyOverrides ?? {},
+    ...(o.contractMods ? { contractMods: o.contractMods } : {}),
     waveId: o.waveId ?? null,
     bossId: o.bossId ?? null,
     content: o.content ?? 'full',
@@ -118,6 +119,7 @@ export function buildBattleSpec(o = {}) {
     // this spec (server/match/fields.js specBounds), so a result computed under a DIFFERENT mod set has to be
     // distinguishable from one computed under this one.
     mods: o.mods && typeof o.mods === 'object' ? JSON.parse(JSON.stringify(o.mods)) : null,
+    ...(o.roomData === true ? { roomData: true } : {}),
     // 行为开关 `morphPairing` 的档位（DESIGN §28.43.1）：这一场战斗的**配对规则**，judged by the same single helper
     // (`shared/morph.js`) the server's prep side and the client's card use. **只在非缺省档才出现这个键** ——
     // 没声明这一格的 spec 与从前逐字节相同（spec 的键纪律与 `server/match/match/battleOpts.js` 同一条）。
@@ -217,6 +219,7 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
     flags: s.flags ?? {},
     fieldId: s.fieldId,
     enemyOverrides: s.enemyOverrides ?? {},
+    ...(s.contractMods ? { contractMods: s.contractMods } : {}),
     waveId: s.waveId ?? null,
     data: BattleClass === Battle ? withUnitLoadouts(toDataSource(dataSource), s.players) : dataSource,
     content: opts.content ?? s.content ?? 'full',

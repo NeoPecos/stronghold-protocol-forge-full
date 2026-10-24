@@ -754,9 +754,9 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .eqr__ok-icon { width: .2rem; height: .2rem; margin-right: .06rem; vertical-align: -.03rem; filter: brightness(0) invert(1); }
 
 /* 局内开发者面板（「全量模拟」专属，ui/devPanel.js）：左侧把手 → 展开占左栏 */
-.devpanel__handle { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 26; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 28px; padding: 12px 0; border: 1px solid rgba(120, 220, 170, .45); border-left: 0; border-radius: 0 7px 7px 0; background: rgba(8, 20, 16, .84); color: #9ff0c8; font: inherit; font-size: 11px; cursor: pointer; }
+.devpanel__handle { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 26; display: flex; align-items: center; gap: 6px; padding: 9px 12px 9px 9px; border: 1px solid rgba(120, 220, 170, .58); border-left: 0; border-radius: 0 7px 7px 0; background: rgba(8, 20, 16, .92); box-shadow: 0 4px 16px rgba(0, 0, 0, .35); color: #bff5dd; font: inherit; font-size: 12px; cursor: pointer; }
 .devpanel__handle:hover { background: rgba(16, 40, 30, .94); }
-.devpanel__handle span { writing-mode: vertical-rl; letter-spacing: .12em; }
+.devpanel__handle span { letter-spacing: .08em; }
 .devpanel { position: fixed; left: 0; top: 76px; bottom: 128px; z-index: 26; width: min(330px, 34vw); display: flex; flex-direction: column; border: 1px solid rgba(120, 220, 170, .4); border-left: 0; border-radius: 0 8px 8px 0; background: rgba(8, 16, 14, .95); color: #dfeee8; font: 12px/1.5 'Segoe UI', system-ui, sans-serif; }
 .devpanel__head { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border-bottom: 1px solid rgba(120, 220, 170, .25); color: #7fe0b0; }
 .devpanel__close { border: 0; background: transparent; color: #9ff0c8; cursor: pointer; padding: 2px; }
@@ -789,6 +789,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .devpanel__go { flex: none; padding: 4px 10px; border: 1px solid #7fe0b0; border-radius: 4px; background: rgba(120, 220, 170, .14); color: #cfe; font: inherit; cursor: pointer; }
 .devpanel__go:disabled { opacity: .4; cursor: default; }
 .devpanel__go--wide { width: 100%; }
+.devpanel__variant { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.devpanel__variant .devpanel__go { width: 100%; }
 .devpanel__tip { margin: 0; color: #7f9a90; }
 
 .devpanel__detail-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }

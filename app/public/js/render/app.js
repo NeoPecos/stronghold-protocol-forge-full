@@ -988,7 +988,7 @@ export async function createFieldView(host, options = {}) {
       v.dimmed = false;
       if (info.kind === 'item' && v.setIcon) v.setIcon(info.icon); // an icon the manifest named late (onAssets)
       if (v.setCount) v.setCount(e.piece.kind === 'token' ? e.piece.count : 0);
-      if (v.setItems) v.setItems(Array.isArray(e.piece.items) ? e.piece.items.map((it) => { const r = data.item(it?.id); return assets.itemIcon ? assets.itemIcon(r ? { trapId: r.trapId, iconId: r.iconId } : it?.id) : null; }) : []);
+      if (v.setItems) v.setItems(itemRenderEntries(e.piece.items));
       v._showFacing = e.area === 'board';
       // the stored facing (a piece held by the direction step shows the wheel's preview instead)
       if (e.area === 'board' && info.dir && !held.has(e.uid) && typeof v.setDir === 'function') v.setDir(info.dir);
@@ -1085,7 +1085,7 @@ export async function createFieldView(host, options = {}) {
       if (info.dir && typeof v.setDir === 'function') v.setDir(info.dir);
       v._showFacing = true;
       if (v.setItems && Array.isArray(info.items) && info.items.length) {
-        v.setItems(info.items.map((it) => { const r = data.item(it); return assets.itemIcon ? assets.itemIcon(r ? { trapId: r.trapId, iconId: r.iconId } : it) : null; }));
+        v.setItems(itemRenderEntries(info.items));
       }
       views.set(info.id, v);
     }
@@ -1681,6 +1681,19 @@ export async function createFieldView(host, options = {}) {
       color: (info.golden || rec?.isGolden) ? 0xffc600 : TIER_COLORS[tier] || TIER_COLORS[1] };
   }
 
+  /** Normalize equipped items for the main-server segmented rail. Keep the DLC-expanded six-slot cap and golden tint. */
+  function itemRenderEntries(items) {
+    const list = Array.isArray(items) ? items.slice(0, 6) : [];
+    return list.map((item) => {
+      const id = typeof item === 'string' ? item : item?.id;
+      const rec = data.item(id);
+      return {
+        url: assets.itemIcon ? assets.itemIcon(rec ? { trapId: rec.trapId, iconId: rec.iconId } : id) : null,
+        golden: !!(rec?.isGolden || item?.isGolden || item?.golden),
+      };
+    });
+  }
+
   function battleView(id) {
     let v = views.get(id);
     if (v) return v;
@@ -1689,10 +1702,10 @@ export async function createFieldView(host, options = {}) {
     v = info.kind === 'device' ? new DeviceView(ctx, info)
       : info.kind === 'item' ? new ItemView(ctx, scoutItemInfo(info))
       : new UnitView(ctx, info, { prep: !!battleMeta?.prep && info.side === 'ally' });
-    // a teammate's operator shows its equipped items like the own prep bench does (item pips; user playtest #2:
+    // a teammate's operator shows its equipped items like the own prep bench does (the main-server equipment rail;
     // at the unit, not only in the detail card) — prep surfaces only, the battle HUD stays as it is
     if (v.setItems && battleMeta?.prep && Array.isArray(info.items) && info.items.length) {
-      v.setItems(info.items.map((it) => { const r = data.item(it); return assets.itemIcon ? assets.itemIcon(r ? { trapId: r.trapId, iconId: r.iconId } : it) : null; }));
+      v.setItems(itemRenderEntries(info.items));
     }
     v.setWorld(info.x, info.y, 0);
     v._seen = false;

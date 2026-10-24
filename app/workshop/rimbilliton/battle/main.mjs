@@ -147,18 +147,24 @@ registerGarrisonInstaller('act_gar_event_onhurt_add_bond_layer', (battle, list) 
 
 // 暴行 "若没有陷入过再部署状态，使下个休整期额外获得雷姆必拓干员"
 registerGarrisonInstaller('SERVER_ADD_CHAR_NO_REDEPLOY', (battle, list) => {
-  const units = new Set(list.map((it) => it.unit));
-  const fell = new Set(); // 本场战斗中陷入过再部署（被击倒 / 退场进入再部署计时）的干员
+  // 同一场可能同时存在暴行本人的效果和莱伊复制出的效果。它们是彼此独立的效果实例，不能用一个棋子 id
+  // 相互覆盖；在 battleStore 中汇总后，把应发总数作为一个标量交给下个休整期。
+  const st = S.battleStore(battle, 'rimbilliton:noRedeploy', () => ({ instances: [], fell: new Set(), installed: false }));
+  st.instances.push(...list);
+  if (st.installed) return;
+  st.installed = true;
   battle.on('death', ({ unit, reason }) => {
-    if (!units.has(unit) || reason === FORCED_EXIT) return; // 联防上一阶段退场的延续不算本场新陷入
-    if (Number.isFinite(unit.respawnAt)) fell.add(unit);    // _remove 对非永久退场设置 respawnAt（永久退场保持 Infinity）
+    if (reason === FORCED_EXIT) return; // 联防上一阶段退场的延续不算本场新陷入
+    if (Number.isFinite(unit.respawnAt)) st.fell.add(unit); // _remove 对非永久退场设置 respawnAt（永久退场保持 Infinity）
   });
   battle.on('battleEnd', () => {
-    for (const it of list) {
-      const u = it.unit;
-      // 未陷入过再部署（上场后未被击倒 / 退场）→ 发放（defId）；否则 null（每场战斗后整体替换，休整期只读到本场的结果）
-      setBattleMark(battle, u.ownerId, 'noRedeploy', fell.has(u) ? null : u.defId);
+    const totals = new Map();
+    for (const it of st.instances) {
+      const pid = it.unit.ownerId;
+      if (!totals.has(pid)) totals.set(pid, 0);
+      if (!st.fell.has(it.unit)) totals.set(pid, totals.get(pid) + Math.max(1, num(it.bb.count, 1)));
     }
+    for (const [pid, total] of totals) setBattleMark(battle, pid, 'noRedeploy', total > 0 ? total : null);
   });
 });
 

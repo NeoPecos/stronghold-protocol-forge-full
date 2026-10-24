@@ -252,6 +252,10 @@ export function healthReport({ startedAt, network, registry, lobby, modHealth = 
 /** Does the query ask for the traffic counters (`traffic`, `traffic=1`, `traffic=true`)? */
 const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.test(query || '');
 
+import { isAnnouncementId } from '../../shared/announcements.js';
+import { ANNOUNCEMENT_ASSET_URL_PREFIX } from '../../shared/announcementAssets.js';
+import { serveAnnouncementAsset } from './announcementAssets.js';
+
 /**
  * The request listener for `http.createServer`.
  * @param {{ serveStatic: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse,
@@ -266,7 +270,7 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   trustProxy: whose forwarding headers name the client (net.js clientAddress; the server's TRUST_PROXY)
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, records = null, accounts = null, admin = null, modsCatalog, modsPanels, httpLanes, publicDir, trustProxy = 'auto', largeAssets = null, assetPack = null, workshopConflicts = null, workshopAssets = null, workshopPackNames = null, studio = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, records = null, accounts = null, admin = null, modsCatalog, modsPanels, httpLanes, publicDir, trustProxy = 'auto', largeAssets = null, assetPack = null, workshopConflicts = null, workshopAssets = null, workshopPackNames = null, studio = null, csp = null, trustedRuntime = null, announcements = null }) {
   /** @type {Map<string, TokenBucket>} 客户端地址 → 只读战绩路由的桶（见文件头那条「已知边界」） */
   const recordBuckets = new Map();
   /** @type {{ at: number, tracks: any[] } | null} 音乐库的短缓存（见 MUSIC_LIBRARY_URL） */
@@ -305,6 +309,27 @@ export function createRequestHandler({ serveStatic, health, log, records = null,
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
     const parts = splitUrl(url);
     if (!parts) { sendError(req, res, 400, '请求地址无效 · Bad request'); return; }
+    // 公告（主服移植）：三条约只读路由，存储是文件型的（var/announcements/），发布用 tools/announcements.mjs。
+    if (announcements && (req.method === 'GET' || req.method === 'HEAD') && parts.rawPath === '/api/announcements') {
+      res.setHeader('Cache-Control', 'no-store');
+      sendJson(req, res, 200, announcements.list());
+      return;
+    }
+    if (announcements && (req.method === 'GET' || req.method === 'HEAD') && parts.rawPath.startsWith('/api/announcements/')) {
+      const announcedId = parts.rawPath.slice('/api/announcements/'.length);
+      const announced = isAnnouncementId(announcedId) ? announcements.read(announcedId) : null;
+      if (!announced) {
+        sendJson(req, res, 404, { error: 'ANNOUNCEMENT_NOT_FOUND' });
+        return;
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      sendJson(req, res, 200, announced);
+      return;
+    }
+    if (announcements && (req.method === 'GET' || req.method === 'HEAD') && parts.rawPath.startsWith(ANNOUNCEMENT_ASSET_URL_PREFIX)) {
+      await serveAnnouncementAsset(req, res, parts.rawPath.slice(ANNOUNCEMENT_ASSET_URL_PREFIX.length), announcements, log);
+      return;
+    }
     // 账号 API（a5 移植，server/http/accountsApi.js）：登录/注册/票据/状态在静态、信任插件与 lane 之前接住。
     // 它不是 lane：这条引擎分支先于 lane 解析；但 /api/account 不在 routeMount.js 的
     // RESERVED_ROUTE_PREFIXES 里，包声明同前缀不会被拒、只会被这里抢先（见 NOTES2.md 风险 9）。

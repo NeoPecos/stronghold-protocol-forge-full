@@ -436,7 +436,7 @@ export const ERR = Object.freeze({
   AUTH_REQUIRED: 'AUTH_REQUIRED',     // hello 未带 auth，且本连接没有可复用的已认证会话
   BAD_CREDENTIALS: 'BAD_CREDENTIALS', // 账号不存在或口令不匹配（**故意不区分**：区分即账号枚举）
   NAME_TAKEN: 'NAME_TAKEN',           // 注册时该账号名已被占用（大小写不敏感）
-  WEAK_PASSWORD: 'WEAK_PASSWORD',     // 口令不满足长度 / 字符集门槛
+  WEAK_PASSWORD: 'WEAK_PASSWORD',
   // room.setPlugins (DESIGN **§34**，上游原文 `§32`；按内容判据改写 —— 插件架构那一节): a plugin this server has not
   // installed; one a room cannot switch on in this version (not a cosmetic or content plugin it loads, not of the room's
   // scope, or not allowed by the server owner's plugins/config.json); a requirement missing or out of range, or a
@@ -465,10 +465,6 @@ export const ERR = Object.freeze({
   TEST_DISABLED: 'TEST_DISABLED',
   TEST_FORBIDDEN: 'TEST_FORBIDDEN',
   // 账号体系（西安实验服 0.3.1 移植主服 accounts.js，2026-10-19）：标题页登录/注册的错误码
-  AUTH_REQUIRED: 'AUTH_REQUIRED',
-  BAD_CREDENTIALS: 'BAD_CREDENTIALS',
-  NAME_TAKEN: 'NAME_TAKEN',
-  WEAK_PASSWORD: 'WEAK_PASSWORD',
   BANNED: 'BANNED',
   FRIEND_UNKNOWN: 'FRIEND_UNKNOWN',
   FRIEND_SELF: 'FRIEND_SELF',
@@ -476,7 +472,6 @@ export const ERR = Object.freeze({
   FRIENDS_FULL: 'FRIENDS_FULL',
   FRIENDS_PENDING: 'FRIENDS_PENDING',
   NOT_FRIEND: 'NOT_FRIEND',
-  ALREADY: 'ALREADY',
   FRIEND_INVITE_UNAVAILABLE: 'FRIEND_INVITE_UNAVAILABLE',
   ROOM_INVITE_ONLY: 'ROOM_INVITE_ONLY',
   INTERNAL: 'INTERNAL',
@@ -488,15 +483,13 @@ export const ERR_TEXT = {
   ROOM_FULL: N_('房间已满'), ROOM_STARTED: N_('模拟已开始'), NOT_HOST: N_('只有房主可以操作'), NOT_READY: N_('仍有玩家未就绪'),
   WRONG_PHASE: N_('当前阶段无法进行该操作'), NO_FUNDS: N_('资金不足'), HAND_FULL: N_('整备区已满'), BOARD_FULL: N_('已达到部署上限'),
   BAD_TILE: N_('无法部署在该位置'), BAD_TARGET: N_('无效的目标'), SOLD_OUT: N_('已售出'), MAX_LEVEL: N_('调度中心已达最高等级'),
-  NOT_YOUR_TURN: N_('尚未轮到你'), ALREADY: N_('已完成该操作'), TEMP_NOT_EMPTY: N_('临时整备区不为空'), ELIMINATED: N_('你已被淘汰'),
+  NOT_YOUR_TURN: N_('尚未轮到你'), TEMP_NOT_EMPTY: N_('临时整备区不为空'), ELIMINATED: N_('你已被淘汰'),
   SPECTATOR: N_('观战中无法进行该操作'), MOD_UNKNOWN: N_('房间指定了本服务器没有的模组包'), INTERNAL: N_('服务器内部错误'),
   MOD_SET_LOCKED: N_('本房间的模组集合已锁定（模拟已开始，或已有博士准备就绪），要改请重开房间'),
   MOD_CONSENT_REQUIRED: N_('本房间声明了模组：请先确认同意加载这些模组，再进入/开始'),
   CHAT_MODE: N_('该房间的聊天设置不允许这条消息'),
   SEAT_CAP_TOO_SMALL: N_('新的人数上限不能小于同盟内现有人数（含 AI 队友）'),
   QUEUE_FULL: N_('正在搜寻的博士已满，请稍后再试'), QUEUE_EMPTY: N_('你不在快速匹配队列中'), QUEUED: N_('你已在同盟中：先离开同盟，才能开始快速匹配'),
-  AUTH_REQUIRED: N_('本服务器需要账号：请登录或注册'), BAD_CREDENTIALS: N_('账号名或口令不正确'),
-  NAME_TAKEN: N_('该代号已被占用'), WEAK_PASSWORD: N_('口令至少 8 位，且不能含控制字符'),
   PLUGIN_UNKNOWN: N_('本服务器没有安装该插件'), PLUGIN_BLOCKED: N_('该插件不能在房间中启用'), PLUGIN_DEPENDENCY: N_('缺少该插件需要的其他插件'),
   PLUGIN_CONFLICT: N_('所选插件互相冲突'), PLUGIN_LIMIT: N_('所选插件的素材总量超出本服务器的上限'),
   PLUGIN_INCOMPATIBLE: N_('该插件不适配本服务器的游戏版本'), PLUGIN_BUSY: N_('本服务器同时运行的插件组合已达上限，请稍后再试'),

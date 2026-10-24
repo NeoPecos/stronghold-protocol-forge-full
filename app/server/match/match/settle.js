@@ -11,6 +11,19 @@ import { msg } from '../../../shared/i18n.js';
 import { onSettle, resetRoundCounters } from '../botEmotes.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 
+/** Split the charge among the leakers and helpers, with the odd points assigned by seat. */
+export function shareLeakLosses(alive, plan, losses) {
+  const shared = new Map(losses);
+  const participants = [...plan.leakers, ...plan.helpers].filter((ps) => alive.includes(ps))
+    .sort((a, b) => (plan.leakers.includes(a) === plan.leakers.includes(b) ? a.seat - b.seat : plan.leakers.includes(a) ? -1 : 1));
+  if (!participants.length) return shared;
+  const total = participants.reduce((sum, ps) => sum + (losses.get(ps.playerId) || 0), 0);
+  const each = Math.floor(total / participants.length);
+  const extra = total % participants.length;
+  participants.forEach((ps, i) => shared.set(ps.playerId, each + (i < extra ? 1 : 0)));
+  return shared;
+}
+
 export class MatchSettle {
   settle(plan, uniteResult) {
     this.phase = PHASE.SETTLE;
@@ -37,10 +50,20 @@ export class MatchSettle {
       losses: {},
     } : null;
     const alive = this.alivePlayers();
+    let baseLosses = new Map(alive.map((ps) => {
+      const r = this.lastResults.get(ps.playerId) || {};
+      const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
+      const loss = uniteRan && plan.leakers.includes(ps) ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted);
+      return [ps.playerId, loss];
+    }));
+    // The five-player rule pools the losses of leakers and their helpers. Isolation restores individual charges.
+    if (uniteRan && alive.length >= 5 && !this.contractFx?.noLpSharing) {
+      baseLosses = shareLeakLosses(alive, plan, baseLosses);
+    }
     for (const ps of alive) {
       const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
       const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
-      const loss = uniteRan && plan.leakers.includes(ps) ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted);
+      const loss = baseLosses.get(ps.playerId) || 0;
       if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
       ps.lp -= loss;
       ps.stats.lpLost += loss;
@@ -83,7 +106,8 @@ export class MatchSettle {
       for (const [bondId, n] of Object.entries(r.layerGains || {})) {
         if (!this.gd.bond(bondId) || !(n > 0)) continue;
         const before = ps.layers[bondId] || 0;
-        const add = layerGainRoom(before, Math.floor(n));
+        const add = Math.min(layerGainRoom(before, Math.floor(n)),
+          Math.max(0, (this.contractFx?.bondLayerCap ?? Infinity) - before));
         if (!(add > 0)) continue;
         ps.layers[bondId] = before + add;
         this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });

@@ -21,8 +21,10 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 import { net } from '/js/net.js';
 import { store } from '/js/store.js';
+import { doctorNo } from '/js/ui/components.js';
+import { friendsStore, requestFriend, refreshFriends } from '/js/ui/friends.js';
 import * as roomMods from '/js/roomMods.js';
-import { toastError } from '/js/ui/toasts.js';
+import { toast, toastError } from '/js/ui/toasts.js';
 
 /**
  * htm 会把**全静态**子树的 vnode 缓存进模板对象里，而 Preact 挂载时会把 DOM 节点与父链写进那个共享 vnode ——
@@ -69,6 +71,7 @@ async function joinRoom(code) {
  * @param {any} msg 整条 `pack.msg` 帧（`ctx.net.on` 的第二个参数，带 `from`）
  */
 const lineOf = (data, msg) => ({
+  playerId: typeof msg?.from === 'string' ? msg.from : '',
   name: data && typeof data.name === 'string' && data.name ? data.name : String(msg && msg.from != null ? msg.from : ''),
   text: data && typeof data.text === 'string' ? data.text : '',
 });
@@ -79,7 +82,9 @@ function LobbyChat({ net: api }) {
   const [lines, setLines] = useState([]);
   const [invites, setInvites] = useState([]);
   const [draft, setDraft] = useState('');
+  const [selected, setSelected] = useState(null);
   const listRef = useRef(null);
+  const inputRef = useRef(null);
 
   // 订阅两条包通道（`ctx.net.on` 只把「本包 + 本通道」的 `pack.msg` 交过来）；卸载时一并退订。
   useEffect(() => {
@@ -120,6 +125,27 @@ function LobbyChat({ net: api }) {
     api.send('lobby', { name: (me && me.name) || '', text });
   };
   const insert = (emoji) => setDraft((d) => (d + emoji).slice(0, TEXT_MAX));
+  const mention = (m) => {
+    const tag = `@${m.name}#${doctorNo(m.playerId)} `;
+    setDraft((value) => `${value}${value && !value.endsWith(' ') ? ' ' : ''}${tag}`.slice(0, TEXT_MAX));
+    setSelected(null);
+    inputRef.current?.focus();
+  };
+  const addFriend = async (m) => {
+    try {
+      await requestFriend(m.name, m.playerId);
+      await refreshFriends();
+      toast('好友申请已发送', 'success');
+      setSelected(null);
+    } catch (error) { toastError(error); }
+  };
+  const friendStatus = (m) => {
+    const data = friendsStore.get().data;
+    if ((data?.friends || []).some((row) => row.playerId === m.playerId)) return '已是好友';
+    if ((data?.outgoing || []).some((row) => row.playerId === m.playerId)) return '已申请';
+    if ((data?.incoming || []).some((row) => row.playerId === m.playerId)) return '接受好友';
+    return '加好友';
+  };
 
   return html`
     <div class="community-chat__head">
@@ -137,8 +163,18 @@ function LobbyChat({ net: api }) {
           ? html`<div class="community-chat__empty">${'还没有人说话'}</div>`
           : lines.map((m, i) => html`
             <div class="community-chat__row" key=${`${m.name}:${i}`}>
-              <span class="community-chat__name">${m.name}</span>
+              ${m.playerId ? html`<button type="button" class="community-chat__name"
+                title=${`点击操作 ${m.name}#${doctorNo(m.playerId)}`}
+                onClick=${() => setSelected(selected === i ? null : i)}>${m.name}<small>#${doctorNo(m.playerId)}</small></button>`
+                : html`<span class="community-chat__name">${m.name}</span>`}
               <span class="community-chat__text">${m.text}</span>
+              ${selected === i && m.playerId ? html`<div class="community-chat__person-menu">
+                <button type="button" onClick=${() => mention(m)}>@ ${m.name}</button>
+                ${m.playerId !== store.get().me?.playerId ? html`<button type="button"
+                  disabled=${friendStatus(m) === '已是好友' || friendStatus(m) === '已申请'}
+                  onClick=${() => addFriend(m)}>${friendStatus(m)}</button>` : null}
+                <button type="button" onClick=${() => setSelected(null)}>关闭</button>
+              </div>` : null}
             </div>`)}
       </div>
       <div class="community-chat__emoji">
@@ -147,7 +183,7 @@ function LobbyChat({ net: api }) {
             onClick=${() => insert(e)}>${e}</button>`)}
       </div>
       <div class="community-chat__send">
-        <input class="community-chat__input" value=${draft} maxlength=${TEXT_MAX} placeholder=${'说点什么…'}
+        <input class="community-chat__input" ref=${inputRef} value=${draft} maxlength=${TEXT_MAX} placeholder=${'说点什么…'}
           onInput=${(e) => setDraft(e.currentTarget.value)}
           onKeyDown=${(e) => { if (e.key === 'Enter') send(); }} />
         <button type="button" class="community-chat__go" disabled=${!draft.trim()} onClick=${send}>${'发送'}</button>

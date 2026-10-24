@@ -836,7 +836,7 @@ export const C2S = {
   'room.setExtendedUnite': { on: isBool },
   'room.setUniteRotation': { on: isBool },
   'room.setUniteHumanFirst': { on: isBool },
-  'room.setUniteHelpers': { n: (v) => Number.isInteger(v) && v >= 2 && v <= 10 && v % 2 === 0 },
+  'room.setUniteHelpers': { n: (v) => v === null || (Number.isInteger(v) && v >= 2 && v <= 10 && v % 2 === 0) },
   'room.setAiBand': { seat: (v) => Number.isInteger(v) && v >= 0 && v < 20, bandId: (v) => typeof v === 'string' && v.length <= 64 },
   // 重构模拟（模式扩展-重构模拟，mode 'recon'）：自由选队 —— 赛前任何在座玩家把自己移到 1..RECON.MAX_TEAMS
   // 号队伍（RECON.MIN_TEAMS..MAX_TEAMS，每队 ≤ RECON.TEAM_SIZE；共享常量见 shared/constants.js）。
@@ -847,6 +847,7 @@ export const C2S = {
   // human seat before every AI seat (server/match/match/phases.js humansFirst); room.state.aiPicksLast
   'room.setAiPicksLast': { on: isBool },
   'room.setDlc': { id: (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v), on: isBool },
+  'room.setContracts': { contracts: (v) => Array.isArray(v) && v.length <= 64 && v.every((id) => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id)) },
   // 房间内改本房间的**模组集合**（G1；docs/WORKSHOP.md §1.9.3）：房主、开局前、且**没有任何真人已就绪**时，
   // 把这一房声明的集合换成另一个（`[]` = 改回「不声明」，即跑服务器加载的全部）。形状与 `room.create.modIds`
   // **逐字同形**（同一格的判据、同一个 `MAX_ROOM_MODS` 上限）—— 一条声明两处写法就是两个会漂的真相。
@@ -1057,6 +1058,7 @@ export const C2S = {
   // solo pause (official PauseUp / ResumeUp, DESIGN §14): freezes the running battle (field clock, deadlines, the
   // browser's local runner) — solo matches only (co-op ⇒ WRONG_PHASE), only while a battle runs; m.public.paused
   'g.pause': { on: isBool },
+  'g.speedVote': { speed: (v) => [1, 2, 3, 4].includes(v) },
   // the stats the own board's units start their next battle with (user playtest #4 item 7; prep phases): answered by
   // the push m.unitStats { seq, round, units: [unitStatsEntry] }; `seq` is echoed so the client keeps the newest answer
   'g.unitStats': { seq: (v) => isInt(v, 0, 2 ** 31), $optional: ['seq'] },

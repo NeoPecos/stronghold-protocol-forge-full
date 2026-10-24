@@ -64,6 +64,7 @@ export function makeMatch(o = {}) {
   }
   h.m = new Match({
     roomCode: 'TEST', mode, difficulty, seats, spectators: o.spectators, seed: o.seed ?? 1, matchNo: o.matchNo, data: o.data ?? DATA, log,
+    ...(o.contracts?.length ? { contracts: o.contracts } : {}),
     // 显式 modeId（缺省 ⇒ 不出现这个键，与从前逐字节相同）：重构模拟这类「房间 mode 与 modeId 不同名」的对局
     // (room mode 'recon' ⇒ mode_recon_<diff>) 要靠它 —— Match 只从 `mode`（solo/coop）推 modeId。
     ...(o.modeId ? { modeId: o.modeId } : {}),
@@ -115,15 +116,6 @@ export function makeMatch(o = {}) {
     verify: o.verify ?? 'off',
     headlessSliceMs: o.headlessSliceMs,
     aiPicksLast: o.aiPicksLast,
-    // a bot prep's layout rehearsal delegated to the room's host (DESIGN §14; test/match/rehearsal-delegate.test.js):
-    // `hostId` is the executor a task is sent to, `botRehearsalDelegateMs` its answer window
-    hostId: o.hostId,
-    botRehearsalDelegate: o.botRehearsalDelegate,
-    botRehearsalDelegateMs: o.botRehearsalDelegateMs,
-    // a gameplay-plugin room (DESIGN §32.6): host rehearsal stays off there (match/rehearsal.js requireCs)
-    cs: o.cs,
-    vs: o.vs,
-    requireCs: o.requireCs,
     // The room's mod set (DESIGN §28.2 / §28.39): `{ digest, packs }`, the same object the lobby hands a real Match.
     // Absent ⇒ no key at all, byte-for-byte the old construction (the 口径 layer's default path).
     ...(o.mods ? { mods: o.mods } : {}),

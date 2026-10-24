@@ -20,7 +20,7 @@
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { PHASE } from '../../../shared/constants.js';
-import { html, Icon, Tooltip } from './components.js';
+import { html, Fragment, Icon, Tooltip } from './components.js';
 import { PlayerAvatar, LpTower, GIcon, LocalSprite } from './gameComponents.js';
 import { EmoteBubble } from './emotes.js';
 import { STATUS_META, sortedPlayers, teamFrameIds } from './gameLogic.js';
@@ -118,12 +118,18 @@ export function rowLpTip(lp, cap = 10) {
  */
 export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = false, observe = null, self: selfLive = null, cap = 10, uniteLocal = null, spMarks = null }) {
   const [openPid, setOpenPid] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
   // the playerId whose avatar just called onWatch, so the other click of a double-click does not open the view again
   const askedAt = useRef(/** @type {{ id: string|null, at: number }} */ ({ id: null, at: 0 }));
   const phaseKey = `${pub?.phase}:${pub?.round}`;
   useEffect(() => { setOpenPid(null); }, [phaseKey, watching, observe?.observing]);
   const players = sortedPlayers(pub);
   if (!players.length) return null;
+  const groups = Array.isArray(pub?.poolGroups) && pub.poolGroups.length ? pub.poolGroups : [players.map((player) => player.playerId)];
+  const byId = new Map(players.map((player) => [player.playerId, player]));
+  const groupByPlayer = new Map(groups.flatMap((members, index) => members.map((id) => [id, index])));
+  const orderedPlayers = groups.flatMap((members) => members.map((id) => byId.get(id)).filter(Boolean));
+  for (const player of players) if (!groupByPlayer.has(player.playerId)) orderedPlayers.push(player);
   // a boss round: the viewer's pair framed in green from the round's start (item 51 — the official bg_team_border,
   // tinted like the official green; a plain green ring without the local art)
   const team = teamFrameIds(pub, myId);
@@ -156,7 +162,9 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
     onWatch(p);
   };
   return html`<aside class=${cx('team', compact && 'team--compact')} aria-label=${t('同盟成员')}>
-    ${players.map((p) => {
+    ${players.length > 4 ? html`<button type="button" class="team__toggle" onClick=${() => setCollapsed((value) => !value)}>${collapsed ? `${t('同盟成员')} (${players.length})` : t('收起')}</button>` : null}
+    ${collapsed ? null : html`<div class="team__list">
+    ${orderedPlayers.map((p, index) => {
       const self = p.playerId === myId;
       const status = p.alive === false ? 'dead' : p.status;
       const meta = STATUS_META[status] || STATUS_META.acting;
@@ -168,7 +176,12 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
       const title = observe ? (self ? (observe.observing ? t('返回战场') : t('你自己')) : t('查看 {name} 的战场', { name: p.name })) : (self ? t('查看自己的阵地') : t('查看 {name} 的阵地', { name: p.name }));
       const lp = rowLp(p, pub, self ? selfLive : null, { uniteLocal, cap });
       const inTeam = team.has(p.playerId);
-      return html`<div key=${p.playerId} class=${cx('team__row', self && 'is-self', inTeam && 'is-team', watched && 'is-watched', p.alive === false && 'is-dead', open && 'is-open')}>
+      const groupIndex = groupByPlayer.get(p.playerId) ?? 0;
+      const labelIndex = (pub?.poolGroupLabels?.[groupIndex] ?? groupIndex + 1) - 1;
+      const beginsGroup = (groups.length > 1 || labelIndex > 0) && (index === 0 || (groupByPlayer.get(orderedPlayers[index - 1].playerId) ?? 0) !== groupIndex);
+      return html`<${Fragment} key=${p.playerId}>
+        ${beginsGroup ? html`<div class="team__group-label" data-group=${labelIndex}>${t('第 {number} 组', { number: labelIndex + 1 })}</div>` : null}
+      <div class=${cx('team__row', self && 'is-self', inTeam && 'is-team', watched && 'is-watched', p.alive === false && 'is-dead', open && 'is-open')} data-group=${labelIndex}>
         <button type="button" class="team__btn" onClick=${() => click(p, self)} onDblClick=${(e) => dblClick(e, p, self)} title=${inTeam && !self ? `${title} · ${t('与你在同一战场')}` : title} aria-expanded=${observe && !self ? String(open) : undefined}>
           <${PlayerAvatar} player=${p} self=${self} />
           ${inTeam ? html`<span class=${cx('team__frame', !frameArt && 'team__frame--plain')} style=${frameArt ? `--frame:url("${frameArt}")` : undefined} aria-hidden="true"></span>` : null}
@@ -178,19 +191,20 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
           ${spMarks?.get(p.playerId) === 'done' ? html`<span class="team__spmark is-done" title=${t('已完成选择')}><${Icon} name="check" /></span>`
             : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
         </button>
+        ${status === 'acting' && !offline ? html`<span class="team__acting" aria-label=${t(meta.text)}>•••</span>` : null}
         <div class="team__info">
           <span class="team__name">${p.name || t('博士')}</span>
           <div class="team__line">
             <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
               tip=${rowLpTip(lp, cap)} />
             ${lp.left != null ? html`<${MissTag} n=${lp.left} name=${self ? null : p.name || t('博士')} />` : null}
-            <${Tooltip} text=${offline ? t('连接已断开') : t(meta.text)} placement="right">
+            ${status === 'acting' && !offline ? null : html`<${Tooltip} text=${offline ? t('连接已断开') : t(meta.text)} placement="right">
               <span class=${cx('team__status', `is-${meta.tone}`, offline && 'is-offline', (offline || STATUS_SPRITE[status]) && localAsset('ui/battle', offline ? 'icon_lost_connect' : STATUS_SPRITE[status]) && 'has-sprite')} aria-label=${t(meta.text)}>
                 ${offline ? html`<${LocalSprite} name="icon_lost_connect" fallback=${html`<${Icon} name="wifiOff" />`} />`
                   : STATUS_SPRITE[status] ? html`<${LocalSprite} name=${STATUS_SPRITE[status]} fallback=${html`<${GIcon} name=${meta.glyph} />`} />`
                   : html`<${GIcon} name=${meta.glyph} />`}
               </span>
-            <//>
+            <//>`}
             ${watched && !self ? html`<span class="team__eye" title=${t('正在查看')}><${GIcon} name="eye" /></span>` : null}
           </div>
           ${open ? html`<button type="button" class="btn btn--primary btn--sm team__ob"
@@ -199,7 +213,9 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
             onClick=${() => observe.onBack()}><span class="btn__label">${t('返回战场')}</span></button>` : null}
         </div>
         ${bubble ? html`<${EmoteBubble} key=${bubble.seq} id=${bubble.id} class="team__bubble" />` : null}
-      </div>`;
+      </div>
+      <//>`;
     })}
+    </div>`}
   </aside>`;
 }

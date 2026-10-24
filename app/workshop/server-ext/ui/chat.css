@@ -74,9 +74,13 @@
 .community-chat__empty { margin: auto; padding: .1rem .02rem; color: var(--text-dim); text-align: center; }
 
 /* 一条消息 */
-.community-chat__row { display: flex; gap: .06rem; word-break: break-word; }
-.community-chat__name { flex: none; max-width: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mint-400); font-weight: 700; }
+.community-chat__row { display: flex; flex-wrap: wrap; gap: .06rem; word-break: break-word; }
+.community-chat__name { flex: none; max-width: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mint-400); font: inherit; font-weight: 700; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.community-chat__name small { color: var(--text-dim); font-size: .1rem; margin-left: .02rem; }
 .community-chat__text { color: var(--text-md); }
+.community-chat__person-menu { flex: 1 1 100%; display: flex; gap: .03rem; padding: .03rem; background: rgba(3, 9, 8, .95); border: 1px solid var(--mint-a35); }
+.community-chat__person-menu button { font: inherit; color: var(--mint-400); background: var(--mint-a10); border: 1px solid var(--mint-a35); padding: .02rem .04rem; cursor: pointer; }
+.community-chat__person-menu button:disabled { opacity: .45; cursor: default; }
 
 /* 表情一排 */
 .community-chat__emoji {

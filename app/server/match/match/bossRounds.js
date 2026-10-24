@@ -10,6 +10,7 @@ import { createRng, deriveSeed } from '../../sim/rng.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { buildBossWave, bountySpawns } from '../waves.js';
 import { pairPlayers, bossPoolHp, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
+import { bossRoundMods } from '../../../shared/contractEffects.js';
 import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_TICKS_PER_INTERVAL } from '../fields.js';
 import { FLOW_TICKER_PRIORITY, BOSS_CLOCK_MS, DELAYS } from './common.js';
 
@@ -55,7 +56,13 @@ export class MatchBoss {
   _bossPoolHp(bossId, aliveCount) {
     const ov = this._devBossOverride(bossId);
     const n = ov ? ov.stats.maxHp : NaN;
-    return Number.isFinite(n) && n > 0 ? Math.max(1, Math.round(n)) : bossPoolHp(this.gd, bossId, aliveCount);
+    const roundMods = bossRoundMods(this.contractFx, this.round);
+    const base = Number.isFinite(n) && n > 0 ? Math.max(1, Math.round(n))
+      : bossPoolHp(this.gd, bossId, aliveCount, roundMods.aliveFull);
+    const mul = this.round === this.gd.hiddenRound
+      ? (this.contractFx?.pact?.hiddenHpMul ?? 1)
+      : roundMods.hpMul;
+    return Math.max(1, Math.round(base * mul));
   }
 
   /** 这一场首领战的 `enemyOverrides`：波次模板自带的 + 面板给这只首领填的（键 = 该首领的 `enemyKey`）。 */
@@ -593,7 +600,13 @@ export class MatchBoss {
       return;
     }
     if (!hidden) {
-      const eligible = victory && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp });
+      if (this.contractFx?.pact && this.round < this.gd.bossRound) {
+        this.later(this.scaled(DELAYS.SETTLE), () => victory
+          ? this.devNextRoundAfterBoss()
+          : this.finish({ victory: false, reason: 'defeat' }));
+        return;
+      }
+      const eligible = victory && !!this.hiddenBossId && (this.contractFx?.pact?.forceHidden || hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp }));
       this.later(this.scaled(DELAYS.SETTLE), () => {
         if (eligible) {
           this.hiddenReached = true;

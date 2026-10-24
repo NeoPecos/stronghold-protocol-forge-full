@@ -254,3 +254,19 @@
 .db__buffrow:first-child { border-top: 0; }
 .db__buffk { flex: 1 1 auto; min-width: 0; font-size: calc(.1 * var(--t)); color: var(--text-lo); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .db__buffv { flex: none; font-size: calc(.11 * var(--t)); color: var(--mint-400); }
+
+/* ---- 打开一块统计面板时，别让其它玩家的竖排「数据统计」按钮压在上面 -------------------------------
+   每个玩家行各有一块 .db-slot（position: fixed，z-index: 6）。面板展开后面板变宽，会盖住下面几行的
+   收起态按钮，但它们与面板同级、DOM 在后 ⇒ 反而画在面板之上（面板背景是半透明的，看起来像穿模）。
+   处理：展开的那块抬到同级之上，其余行的收起态按钮隐藏 —— 面板展开时它们本来就被遮住、点不到。 */
+.db-slot:has(.db.is-open) { z-index: 8; }
+.db-root:has(.db.is-open) .db-slot:not(:has(.db.is-open)) .db__tab { visibility: hidden; }
+
+/* ---- 其它弹层打开时，统计槽位整体让位 ---------------------------------------------------------------
+   .db-slot 挂在官方槽 screen.game.overlay 的 .mod-host 里，与引擎面板不在同一个层叠上下文 ——
+   实测它会画在盟约面板（.bpop，z-index: 10）等弹层之上（CORE BOND 面板左侧压着竖排「数据统计」）。
+   这几个弹层都是「打开时才渲染」，用 body:has() 判存在即可，不靠 z-index 比大小。 */
+body:has(.bpop) .db-slot,
+body:has(.dpanel) .db-slot,
+body:has(.spov) .db-slot,
+body:has(.modal) .db-slot { visibility: hidden; }

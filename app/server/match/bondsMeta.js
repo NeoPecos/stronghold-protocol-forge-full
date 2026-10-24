@@ -159,6 +159,12 @@ export function computeBonds(gd, ps) {
     out[id] = { count, active: tier >= 1, tier, layers: layersOf(id) };
     if (harmonyBonus) out[id].harmony = harmonyBonus;
   }
+  const limit = gd.contractFx?.maxActiveBonds;
+  if (Number.isInteger(limit) && limit >= 0) {
+    const active = Object.entries(out).filter(([, b]) => b.active)
+      .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]));
+    for (const [id] of active.slice(limit)) { out[id].active = false; out[id].tier = 0; }
+  }
   return out;
 }
 

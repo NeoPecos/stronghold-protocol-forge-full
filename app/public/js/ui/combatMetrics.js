@@ -17,6 +17,7 @@ export function CombatMetricsPanel({ myId, onClose, runner = battleRunner }) {
   const [scope, setScope] = useState('battle');
   const closeRef = useRef(null);
   const panelRef = useRef(null);
+  const dragRef = useRef(null);
   useTicker(250);
   useEffect(() => {
     const previous = document.activeElement;
@@ -68,7 +69,26 @@ export function CombatMetricsPanel({ myId, onClose, runner = battleRunner }) {
   const maximum = Math.max(1, ...result.rows.map((r) => r.damage));
   return html`<section ref=${panelRef} id="combat-metrics-panel" class="combat-metrics brackets" role="dialog" aria-label=${t('作战统计')}
       onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); e.stopPropagation(); }}>
-    <header class="combat-metrics__head">
+    <header class="combat-metrics__head" title=${t('拖动可移动统计面板')}
+      onPointerDown=${(e) => {
+        if (e.button !== 0 || e.target.closest('button')) return;
+        const rect = panelRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove=${(e) => {
+        if (!dragRef.current || !panelRef.current) return;
+        const panel = panelRef.current;
+        const { dx, dy } = dragRef.current;
+        const x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, e.clientX - dx));
+        const y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, e.clientY - dy));
+        panel.dataset.dragged = 'true';
+        panel.style.left = `${x}px`;
+        panel.style.top = `${y}px`;
+      }}
+      onPointerUp=${() => { dragRef.current = null; }}
+      onPointerCancel=${() => { dragRef.current = null; }}>
       <div><span class="combat-metrics__micro">COMBAT ANALYSIS</span><h2>${t('作战统计')}</h2></div>
       <button ref=${closeRef} type="button" class="combat-metrics__close" aria-label=${t('关闭作战统计')} onClick=${onClose}><${Icon} name="close" /></button>
       <div class="combat-metrics__tools">

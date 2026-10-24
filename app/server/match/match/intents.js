@@ -12,6 +12,33 @@ import { OK, fail } from './common.js';
 import { onHumanEmote } from '../botEmotes.js';
 
 export class MatchIntents {
+  /** Change the authoritative combat clock: solo spreads apply at once, co-op in prep after every living human agrees. */
+  voteCombatSpeed(ps, speed) {
+    if (!ps.alive || ps.isBot) return fail(ERR.WRONG_PHASE);
+    if (![1, 2, 3, 4].includes(speed) || speed === this.gameSpeed) return fail(ERR.BAD_TARGET);
+    // 独立模拟只有一个真人：倍速随时可改、立即生效；同盟仍是「整备期 + 全员同意」。
+    const humans = this.order.filter((seat) => seat.alive && !seat.isBot && !seat.left);
+    if (humans.length === 1 && humans[0].playerId === ps.playerId) {
+      this.gameSpeed = speed;
+      this.speedVote = null;
+      this.markPublic();
+      return OK;
+    }
+    if (this.phase !== PHASE.PREP) return fail(ERR.WRONG_PHASE);
+    const voters = this.order.filter((seat) => seat.alive && !seat.isBot && !seat.left).map((seat) => seat.playerId);
+    if (!voters.includes(ps.playerId)) return fail(ERR.BAD_TARGET);
+    if (this.speedVote && this.speedVote.target !== speed) return fail(ERR.BAD_TARGET, 'another speed vote is pending');
+    if (!this.speedVote) this.speedVote = { target: speed, voters, agreed: [] };
+    else this.speedVote.voters = voters;
+    if (!this.speedVote.agreed.includes(ps.playerId)) this.speedVote.agreed.push(ps.playerId);
+    if (this.speedVote.voters.every((id) => this.speedVote.agreed.includes(id))) {
+      this.gameSpeed = speed;
+      this.speedVote = null;
+    }
+    this.markPublic();
+    return OK;
+  }
+
   _handle(ps, msg) {
     switch (msg.t) {
       case 'g.infoReady':
@@ -55,6 +82,7 @@ export class MatchIntents {
       case 'g.watch': return this.watch(ps, msg.fieldId, msg.playerId ?? null);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
       case 'g.pause': return this.setPause(ps, !!msg.on);
+      case 'g.speedVote': return this.voteCombatSpeed(ps, msg.speed);
       // the stats the board's units start their next battle with (the detail card in prep, user playtest #4 item 7)
       case 'g.unitStats': return this.unitStats(ps, msg.seq ?? null);
       case 'g.leave': this.onLeave(ps.playerId); return OK;
@@ -141,7 +169,8 @@ export class MatchIntents {
         return OK;
       }
       case 'grantChess': {
-        if (typeof msg.chessId !== 'string' || !this.gd.chess(msg.chessId)) return fail(ERR.BAD_TARGET, 'bad chessId');
+        const rec = typeof msg.chessId === 'string' ? this.gd.chess(msg.chessId) : null;
+        if (!rec) return fail(ERR.BAD_TARGET, 'bad chessId');
         const piece = ps.acquireChess(msg.chessId, { source: 'dev', fromPool: false });
         if (!piece) return fail(ERR.BAD_TARGET, 'operator not granted (bench full)');
         // 数值覆盖随这个棋子进战斗（`piece.meta.data.devExt` → `u.pieceData`，由 dev-ext 包的服务端战斗逻辑读它挂 mods）
@@ -150,6 +179,7 @@ export class MatchIntents {
           piece.meta.data = { ...(piece.meta.data || {}), devExt: msg.overrides };
           ps.dirty();
         }
+        this.toast(ps, 'info', `[DEV] operator: ${rec.name || msg.chessId} (${rec.isGolden ? 'elite' : 'normal'}) -> bench`);
         return OK;
       }
       case 'spawnEnemy': {
@@ -214,7 +244,7 @@ export class MatchIntents {
         }
         // 本回合已经是首领回合（官方或已被强制）：立刻按新首领重排配对与波次；否则作用于下一场首领战
         const r = this.round;
-        if (r === this.gd.bossRound || r === this.devBossRound) {
+        if (this.gd.isBossRound(r) || r === this.devBossRound) {
           this._planBossWaves();
           this.markPublic();
           for (const p of this.players.values()) this.markPrivate(p);
@@ -289,7 +319,7 @@ export class MatchIntents {
     const units = [];
     // the flags of the battle it previews: a normal round gains IN_BATTLE layers from its start (a <战斗开始时> layer gain
     // raises bond stats at t = 0 there too); the Final Assault / Hidden Core fight without (previewed as a normal field)
-    const bossRound = this.round === this.gd.bossRound || this.round === this.gd.hiddenRound;
+    const bossRound = this.gd.isBossRound(this.round) || this.round === this.gd.hiddenRound;
     const b = this.newBattle({
       seed: deriveSeed(this.seed, `preview:${this.round}:${ps.seat}`), kind: 'normal', modeId: this.modeId, round: this.round,
       stageId: this.stageId, rect: { ...this.layout.battle.normal }, timeLimit: 60, players, spawns: [], routes: this.wave ? this.wave.routes : [],

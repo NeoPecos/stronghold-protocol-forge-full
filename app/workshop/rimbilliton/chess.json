@@ -1,8 +1,8 @@
 {
- "chess_char_1_21_a": {
-  "chessId": "chess_char_1_21_a",
-  "baseId": "chess_char_1_21_a",
-  "goldenId": "chess_char_1_21_b",
+ "chess_char_1_22_a": {
+  "chessId": "chess_char_1_22_a",
+  "baseId": "chess_char_1_22_a",
+  "goldenId": "chess_char_1_22_b",
   "isGolden": false,
   "tier": 1,
   "identifier": 266,
@@ -36,7 +36,7 @@
   "price": 2,
   "sellPrice": 1,
   "upgradeNum": 3,
-  "upgradeChessId": "chess_char_1_21_b",
+  "upgradeChessId": "chess_char_1_22_b",
   "status": {
    "phase": 1,
    "level": 55,
@@ -236,10 +236,10 @@
    }
   ]
  },
- "chess_char_1_21_b": {
-  "chessId": "chess_char_1_21_b",
-  "baseId": "chess_char_1_21_a",
-  "goldenId": "chess_char_1_21_b",
+ "chess_char_1_22_b": {
+  "chessId": "chess_char_1_22_b",
+  "baseId": "chess_char_1_22_a",
+  "goldenId": "chess_char_1_22_b",
   "isGolden": true,
   "tier": 1,
   "identifier": 267,

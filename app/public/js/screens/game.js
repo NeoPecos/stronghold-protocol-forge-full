@@ -244,9 +244,8 @@ function MatchScreen() {
   const [emoteOpen, setEmoteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
-  // 战斗倍速（顶栏那个 ×1/×2/×3/×4）：**纯本地播放选择** —— 同一段确定的 tick 序列只是推进得更快，
-  // 所以战果一字不变（runner.setRate 的注释 + test/match/runner.test.js 用 b.result 逐字节相同钉住）。
-  const [playRate, setPlayRate] = useState(1);
+  // 倍速由服务端在休整期经全员投票决定；本地回放始终按服务端战斗时钟播放。
+  useEffect(() => { battleRunner?.setRate(1); }, []);
   const [drag, setDrag] = useState(null);                // { uid, kind, id } while dragging a piece
   const [facing, setFacing] = useState(null);            // direction step: { uid, piece, row, col, grid, name }
   const [sel, setSel] = useState(null);                  // tapped own piece: { uid }
@@ -1540,7 +1539,14 @@ function MatchScreen() {
       }
       if (act === 'retreat' || act === 'sell') {
         if (!L.showPrep || L.drag || L.facing || L.selBusy || L.pen || !pointer || pointer.buttons) return;
-        const uid = L.view?.pieceAtClientPoint(pointer.x, pointer.y);
+        // 出售：优先对「已选中的己方干员」（详情卡打开的那个）生效，没选中时才按鼠标位置命中
+        let uid = null;
+        if (act === 'sell') {
+          const selected = Number.isInteger(L.detail?.uid) ? L.detail.uid : (Number.isInteger(L.sel?.uid) ? L.sel.uid : null);
+          if (Number.isInteger(selected) && L.placeCtx.pieces.get(selected)?.piece.kind === 'chess'
+            && underframeActions(L.placeCtx, selected)?.sell != null) uid = selected;
+        }
+        if (!Number.isInteger(uid)) uid = L.view?.pieceAtClientPoint(pointer.x, pointer.y);
         const hovered = Number.isInteger(uid) ? L.placeCtx.pieces.get(uid) : null;
         if (hovered?.piece.kind !== 'chess') return;
         const available = underframeActions(L.placeCtx, uid);
@@ -1709,7 +1715,7 @@ function MatchScreen() {
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
-        speed=${playRate} onSpeed=${battleRunner ? (n) => setPlayRate(battleRunner.setRate(n)) : null}
+        speed=${pub?.combatSpeed} onSpeed=${(n) => actions.speedVote(n)}
         spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom} />
 
       <div class="gm__bonds">
@@ -1723,8 +1729,9 @@ function MatchScreen() {
             if (!bondsCollapsed && bondOpen?.from === 'strip') setBondOpen(null);
             setBondsCollapsed(!bondsCollapsed);
           }}><${Icon} name=${bondsCollapsed ? 'chevronRight' : 'chevronLeft'} /></button>
-        <div id="match-bond-strip" class="gm__bond-list" hidden=${bondsCollapsed}>
-          <${BondStrip} bonds=${stripBonds} layersDisabled=${layersDisabled} openId=${bondPop && bondPop.ownerId === strip.ownerId ? bondPop.bondId : null}
+        <div id="match-bond-strip" class="gm__bond-list" hidden=${bondsCollapsed} role="region" aria-label=${t('我的盟约')} tabIndex="0"
+          onWheel=${(e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY; }}>
+          <${BondStrip} bonds=${stripBonds} max=${Infinity} layersDisabled=${layersDisabled} openId=${bondPop && bondPop.ownerId === strip.ownerId ? bondPop.bondId : null}
             owner=${strip.name} onOpen=${(id) => openBond(id, strip.ownerId, 'strip')} />
         </div>
       </div>

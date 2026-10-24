@@ -67,7 +67,8 @@ export class PlayerEconomy {
     if (!this.gd.bond(bondId) || !Number.isFinite(n) || n <= 0) return 0;
     if (requireActive && !(this.bonds[bondId] && this.bonds[bondId].active)) return 0;
     const before = this.layers[bondId] || 0;
-    const add = layerGainRoom(before, Math.floor(n));
+    const add = Math.min(layerGainRoom(before, Math.floor(n)),
+      Math.max(0, (this.m?.contractFx?.bondLayerCap ?? Infinity) - before));
     if (add <= 0) return 0;
     this.layers[bondId] = before + add;
     this.recompute();
@@ -85,7 +86,9 @@ export class PlayerEconomy {
     const ev = { slot, kind: slot.kind, id: slot.id, price: slot.basePrice };
     this.m.dispatch(this, 'onPrice', ev, { quiet: true });
     const p = Number(ev.price);
-    return Number.isFinite(p) ? Math.max(0, Math.round(p)) : slot.basePrice;
+    const base = Number.isFinite(p) ? Math.max(0, Math.round(p)) : slot.basePrice;
+    const fx = this.m?.contractFx;
+    return base + (fx && this.m.round >= (fx.priceFromRound ?? 1) ? fx.priceAdd : 0);
   }
 
   _rollChessSlot() {
@@ -278,8 +281,10 @@ export class PlayerEconomy {
 
   refresh() {
     const g = this._gate(); if (g) return g;
+    if (this.m?.contractFx?.maxRefreshesPerRound != null && this.round.refreshes >= this.m.contractFx.maxRefreshesPerRound) return fail(ERR.BAD_TARGET, 'contract refresh limit reached');
     const free = this.shop.freeRefreshes > 0;
-    const price = free ? 0 : this.gd.refreshPrice;
+    const fx = this.m?.contractFx;
+    const price = free ? 0 : this.gd.refreshPrice + (fx && this.m.round >= (fx.priceFromRound ?? 1) ? fx.priceAdd : 0);
     if (!free && this.funds < price) return fail(ERR.NO_FUNDS);
     if (free) this.shop.freeRefreshes--;
     else this.spend(price);

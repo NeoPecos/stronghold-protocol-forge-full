@@ -53,11 +53,13 @@ import { SupportButton } from './support.js';
 import { modComponent } from '../ui/modComponents.js';
 import { ChatPanel } from './chat.js';
 import { DlcPage } from './dlc.js';
+import { ContractsPanel, ContractsButton } from '../ui/contracts.js';
 import * as roomMods from '../roomMods.js';
 import { roomModsOf, shortDigest, currentModSet } from '../roomMods.js';
 import { loadCatalog, planAlignment, alignRoom, missingPackIds, storeFor } from '../mods/align.js';
 import { net } from '../net.js';
 import { store, useStore, shallowEqual, emptyMatch, isSpectating, serverNow, loadPref, savePref } from '../store.js';
+import { contractsAllowedAt, resolvePicked, contractPoints } from '../../../shared/contracts.js';
 import { data, useData } from '../data.js';
 import { chessAvatarUrl } from '../ui/assetUrls.js';
 import { CARD_PREF, cardOperators, seatPortrait } from '../ui/seatArt.js';
@@ -70,6 +72,9 @@ import { ProtocolScene } from '../ui/protocolScene.js';
 import { SearchPanel, FoundPanel } from '../ui/matchFlow.js';
 import { usePresence, useRise, afterLeave } from '../ui/transitions.js';
 import { t, tc } from '../../../shared/i18n.js';
+
+/** 房主上一次启用的合约词条：本地记忆，换房间/换对局后自动套回（服务端只认房主、要求解算结果一致）。 */
+const CONTRACTS_PREF = 'contracts.last';
 
 const MAX_SEATS = Number(SEAT_CONST.MAX_SEATS) || 4;
 const DEFAULT_SEATS = Number(SEAT_CONST.DEFAULT_SEATS) || MAX_SEATS;
@@ -744,6 +749,7 @@ export function RoomScreen() {
   const [picker, setPicker] = useState(false);
   const [opts, setOpts] = useState(false);
   const [dlcPage, setDlcPage] = useState(false);
+  const [contractsOpen, setContractsOpen] = useState(false);
   const [searchWant, setSearchWant] = useState(false); // the host asked to search and has not stopped
   const [searchSince, setSearchSince] = useState(0);
   const [found, setFound] = useState(false);
@@ -790,6 +796,8 @@ export function RoomScreen() {
 
   const online = conn.status === 'online';
   const coop = room ? room.mode !== 'solo' : false;
+  // 危机合约：同盟（coop）与独立模拟（solo）都能开；重构模拟（recon）按多人分队处理，不提供合约。
+  const contractsRoom = room ? (room.mode === 'coop' || room.mode === 'solo') : false;
   const facts = room ? roomFacts(room, me.playerId) : null;
   const searchable = CAN_QUEUE && !!room && coop && facts.isHost && room.private !== true && facts.seats.length <= DEFAULT_SEATS && !room.inMatch;
   const firepower = room?.random === true;
@@ -856,6 +864,33 @@ export function RoomScreen() {
       if (alive.current) setBusy(null);
     }
   };
+
+  // 合约词条记忆: 房主上一次启用的词条集合存在本地, 新建的房间进来就把它们套回去 —— 否则每局都要把十几条重新点一遍.
+  // 服务端 room.setContracts 只认房主, 且要求 resolvePicked(contracts, seatCap, difficulty) 与传入完全一致(否则
+  // 'conflicting contracts'); 所以套用前先按本房的座位数与难度解算一遍, 解算结果与记忆不一致就放弃, 让房主手动点.
+  const restoredContracts = useRef(null);
+  useEffect(() => {
+    if (!room || !facts || !facts.isHost) return;
+    if (room.mode !== 'coop' && room.mode !== 'solo') return;
+    if (room.inMatch) return;
+    if (room.contracts && room.contracts.length) return;
+    if (restoredContracts.current === room.code) return;
+    const saved = loadPref(CONTRACTS_PREF, null);
+    const ids = saved && Array.isArray(saved.ids) ? saved.ids.filter((id) => typeof id === 'string') : [];
+    if (!ids.length) return;
+    const difficulty = room.difficulty ?? null;
+    if (!contractsAllowedAt(difficulty)) return;
+    const capacity = Number.isInteger(room.seatCap) ? room.seatCap
+      : (Number.isInteger(room.maxSeats) ? room.maxSeats : 0);
+    const next = resolvePicked(ids, capacity, difficulty);
+    if (next.length !== ids.length || next.some((id, i) => id !== ids[i])) { restoredContracts.current = room.code; return; }
+    restoredContracts.current = room.code;
+    net.request('room.setContracts', { contracts: next })
+      .then(() => {
+        if (alive.current) toast(t('已套用上次启用的合约（{n} 条 · {pts} 分）', { n: next.length, pts: contractPoints(next, difficulty) }), 'success');
+      })
+      .catch((err) => { if (alive.current) toastError(err); });
+  }, [room?.code, room?.contracts?.length, room?.mode, room?.inMatch, room?.difficulty, room?.seatCap, room?.maxSeats, facts?.isHost]);
 
   const toggleReady = () => run('ready', () => net.request('room.ready', { ready: !myReady }));
   // 重构模拟（mode 'recon'）的自由选队：换队不重置就绪（服务端同一口径），满员 / 对局锁由服务端点名拒绝。
@@ -975,8 +1010,10 @@ export function RoomScreen() {
           <b>${modeName}<span class="rs-clock__sep"></span>${t('同盟已等待')} <span class="num">${clock((Date.now() - since) / 1000)}</span></b>
           <span>${t('当前延迟')}<b class=${`num rs-ping rs-ping--${!online || !Number.isFinite(conn.ping) ? 'off' : conn.ping < 60 ? 'low' : conn.ping < 200 ? 'mid' : 'high'}`}>${online && Number.isFinite(conn.ping) ? Math.round(conn.ping) : '--'}</b>ms</span>
         </div>
+        ${contractsRoom ? html`<${ContractsButton} room=${room} compact=${true} onClick=${() => setContractsOpen(true)} />` : null}
         ${room.dlc ? html`<button type="button" class="rs-dlc-entry rs-dlc-entry--compact" aria-label=${t('DLC 管理')} onClick=${() => setDlcPage(true)}>DLC${room.dlc.enabled.length ? ` · ${room.dlc.enabled.length}` : ''}</button>` : null}
         <div class="rs-tools">
+          ${contractsRoom ? html`<${ContractsButton} room=${room} onClick=${() => setContractsOpen(true)} />` : null}
           ${room.dlc ? html`<button type="button" class="rs-dlc-entry" onClick=${() => setDlcPage(true)}>${t('DLC 管理')}${room.dlc.enabled.length ? ` · ${room.dlc.enabled.length}` : ''}</button>` : null}
           <${Button} variant="secondary" size="sm" square=${true} icon="chart" class="stats-entry" onClick=${openStats} title=${t('统计数据')} aria-label=${t('统计数据')} />
           ${coop && !openFriends.unavailable ? html`<${Button} variant="secondary" size="sm" square=${true} icon="users" class="rs-friends" onClick=${() => openFriends()} title=${t('好友 · 邀请好友加入')} aria-label=${t('好友')} />` : null}
@@ -1034,7 +1071,7 @@ export function RoomScreen() {
     */ null}
     <div class="mod-host" data-mod-slot="screen.room.aside"></div>
     <${RoomModsPanel} room=${room} myId=${me.playerId} onAlignment=${setAlign} hidden=${true} />
-    <${ChatPanel} />
+    ${coop ? html`<${ChatPanel} />` : null}
     <${SpectatorBar} facts=${facts} myId=${me.playerId} busy=${busy} onRemove=${removeSpectator} onSit=${sit} />
 
     <footer class="rs-foot">
@@ -1084,6 +1121,12 @@ export function RoomScreen() {
     ${picking ? html`<${CardPicker} current=${myCard} list=${cardList} m=${m} onPick=${pickCard} onClose=${() => setPicking(false)} />` : null}
     ${protoShown ? html`<${RoomProtocol} room=${room} variant=${variant} busy=${busy} onClose=${() => setPicker(false)} onPick=${setDifficulty} leaving=${protoLeaving} />` : null}
     ${dlcPage && room.dlc ? html`<${DlcPage} room=${room} myId=${me.playerId} onClose=${() => setDlcPage(false)} />` : null}
+    <${ContractsPanel} open=${contractsOpen} room=${room} isHost=${facts.isHost}
+      busy=${busy} onClose=${() => setContractsOpen(false)}
+      onApply=${(contracts) => run('contracts', async () => {
+        await net.request('room.setContracts', { contracts });
+        savePref(CONTRACTS_PREF, { ids: contracts, difficulty: room.difficulty ?? null });
+      })} />
   </div>`;
 }
 
@@ -1092,7 +1135,8 @@ export function TrustedNotice() { return null; }
 
 /** phase B：扩展联防 / 联防护卫轮换 / 真人先手 / 协防人数（0.3.0 房间规则）。 */
 function UniteOptions({ room, host, busy, online }) {
-  const limit = Math.min(10, Math.max(2, Math.floor(Math.max(1, room.maxSeats || 4) / 4) * 2));
+  const seated = (room.seats || []).filter(Boolean).length;
+  const limit = Math.min(10, Math.max(2, Math.floor(Math.max(1, seated) / 4) * 2));
   const dis = !host || !!busy || !online;
   const set = (name, payload) => { net.request(name, payload).catch(() => {}); };
   return html`<label class="rs-opt"><input type="checkbox" checked=${room.extendedUnite === true} disabled=${dis}
@@ -1105,8 +1149,9 @@ function UniteOptions({ room, host, busy, online }) {
       onChange=${(e) => set('room.setUniteHumanFirst', { on: e.currentTarget.checked })} />
       <span>${t('真人先手')}<small>${t('真人席位排在 AI 席位之前')}</small></span></label>` : null}
     <label class="rs-opt rs-opt--cap"><span>${t('协防人数')}<small>${t('每轮最多 {n} 名（偶数）', { n: limit })}</small></span>
-      <select value=${String(room.uniteHelpers || 2)} disabled=${dis || !room.extendedUnite}
-        onChange=${(e) => set('room.setUniteHelpers', { n: Number(e.currentTarget.value) })}>
-        ${Array.from({ length: limit / 2 }, (_, k) => (k + 1) * 2).map((n) => html`<option key=${n} value=${String(n)} selected=${n === (room.uniteHelpers || 2)}>${t('{n} 人', { n })}</option>`)}
+      <select value=${room.uniteHelpersAuto ? 'auto' : String(room.uniteHelpers || 2)} disabled=${dis || !room.extendedUnite}
+        onChange=${(e) => set('room.setUniteHelpers', { n: e.currentTarget.value === 'auto' ? null : Number(e.currentTarget.value) })}>
+        <option value="auto">${t('自动')} (${t('{n} 人', { n: limit })})</option>
+        ${Array.from({ length: limit / 2 }, (_, k) => (k + 1) * 2).map((n) => html`<option key=${n} value=${String(n)}>${t('{n} 人', { n })}</option>`)}
       </select></label>`;
 }

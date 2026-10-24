@@ -47,6 +47,7 @@ import { html, UiHosts, Button, MicroLabel, closeAllDialogs, confirmDialog } fro
 import { ConnectionBanner } from './ui/connBanner.js';
 import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
 import { net, identity, NetError } from './net.js';
+import { AnnouncementHost, installAnnouncements } from './ui/announcements.js';
 import { store, useStore, emptyMatch, selectRoute, entryGateBlocked, sessionResetNotice, isSpectating, loadPref, savePref } from './store.js';
 import { applyPublic } from './matchDelta.js';
 import { data } from './data.js';
@@ -437,7 +438,7 @@ function syncRoomAppearance(room, myId) {
  * @param {any} room `store.room`（大厅 / 离开房间后是 null）
  */
 function syncDataFace(room) {
-  if (data.setBase(roomDataBase(room && room.mods, roomMods.currentModSet()))) data.loadAll(GAME_FILES).catch(() => {});
+  if (data.setBase(roomDataBase(room && room.mods, roomMods.currentModSet(), room?.roomData === true))) data.loadAll(GAME_FILES).catch(() => {});
 }
 
 // 由 **store.room 的变化**驱动，而不是逐个调用点去加：房间的进出有好几条路径（服务端的 `room.state`、房间界面
@@ -656,6 +657,7 @@ function App() {
     <${TrustedNotice} />
     <${ConnectionBanner} />
     <${ToastHost} />
+    <${AnnouncementHost} />
     <${UiHosts} />
     <${GuideHost} />
     <${LoadoutHost} />
@@ -725,6 +727,8 @@ async function boot() {
   }));
 
   wireNet();
+  // 公告（主服移植）：标题页/大厅入口 + 每次进入大厅前检查一次；见 public/js/ui/announcements.js
+  installAnnouncements({ appStore: store, selectRoute, net, restoreGraceMs: RESTORE_GRACE_MS });
   installStatsRecorder(store); // follows the match on screen, so a 放弃模拟 can be recorded (ui/stats.js)
   installLoadoutSync({ net });
   installSupportSync({ net });

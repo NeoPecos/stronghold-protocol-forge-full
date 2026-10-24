@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "android": {
+    "versionCode": 1,
+    "version": "1.0.0",
+    "notes": "5服首个客户端版本：内置全量素材与 0.3.1 内核，支持内置更新器、服务器切换、重新连接与 F11 全屏。",
+    "page": "https://sp5.bs.leio.fun/client/",
+    "patches": []
+  },
+  "windows": {
+    "versionCode": 1,
+    "version": "1.0.0",
+    "notes": "5服首个客户端版本：内置全量素材与 0.3.1 内核，支持内置更新器、服务器切换、重新连接与 F11 全屏。",
+    "page": "https://sp5.bs.leio.fun/client/",
+    "patches": []
+  }
+}

@@ -1,0 +1,7 @@
+[
+  { "name": "CLa", "note": "本包作者：东盟约的设计、数据、干员 kit、战斗模块与素材整理" },
+  { "name": "Stronghold-Protocol: Alliance", "note": "本体（非官方同人复刻），GPL-3.0-or-later", "url": "https://github.com/sganggs/Stronghold-Protocol" },
+  { "name": "Stronghold-Protocol-Forge", "note": "工坊与编辑器；本包内联的官方干员实现（op-saga / op-haruka / op-hsgma2 / detmath / body / damage.hasHp）来自该仓库", "url": "https://github.com/XiaMo233M/Stronghold-Protocol-Forge" },
+  { "name": "PRTS wiki", "note": "干员数值、技能倍率与部分头像 / 立绘 / 技能图标的公开来源", "url": "https://prts.wiki/" },
+  { "name": "明日方舟", "note": "原始游戏与全部角色设计，© Hypergryph / Yostar；随包素材版权归其所有", "url": "https://ak.hypergryph.com/" }
+]

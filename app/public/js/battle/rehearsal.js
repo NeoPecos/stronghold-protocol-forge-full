@@ -65,7 +65,7 @@ export function installRehearsal({ net, runner = battleRunner, createWorker = ()
   };
 
   /** Give one worker instance the page's simulation data (once): its frozen /data/*.json as the runner loaded them. */
-  const sendData = (inst) => runner.ensureSim().then((sim) => {
+  const sendData = (inst) => runner.ensureSim(inst.task?.specs?.[0] || null).then((sim) => {
     // official data only: a content-set load names its `cs` and may carry scripts this worker must not run
     if (!sim || !sim.raw || (typeof sim.cs === 'string' && sim.cs !== '')) throw new Error('no official simulation data');
     if (w !== inst) return; // the instance was dropped while the data loaded: nothing is posted into it

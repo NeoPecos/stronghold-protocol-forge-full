@@ -124,6 +124,7 @@ export class GameData {
    *        与这一局的 `DataSource` **共用同一份**（两边分叉就是 bug）。不给 ⇒ 由 `variants` 自己建一份（等价）。
    */
   constructor(data, modeId, opts = {}) {
+    this.contractFx = opts.contractFx || null;
     this.raw = data && typeof data === 'object' ? data : {};
     this.config = getConfig(this.raw) || {};
     this.modeId = modeId;
@@ -262,7 +263,11 @@ export class GameData {
    * Multiplier of bloodPoint for the leader pool (see bossPoolHp; the rule and the config keys: bossPoolShareOf).
    * @param {number} [aliveCount]
    */
-  bossPoolShare(aliveCount) {
+  bossPoolShare(aliveCount, aliveFull = null) {
+    if (Number.isInteger(aliveFull) && aliveFull > 0) {
+      return bossPoolShareOf({ ...(this.mode.bossHpScale || {}), aliveFull }, this.config.bossHpScale,
+        this.isSolo, aliveCount, 1);
+    }
     return bossPoolShareOf(this.mode.bossHpScale, this.config.bossHpScale, this.isSolo, aliveCount, this.seatCap);
   }
 
@@ -375,8 +380,9 @@ export class GameData {
     const arr = Array.isArray(this.economy.income) ? this.economy.income : DEFAULTS.income;
     const cap = numOr(this.economy.incomeCap, DEFAULTS.incomeCap);
     const v = arr[round];
-    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
-    return Math.max(0, Math.min(cap, 3 + round));
+    const base = typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : Math.max(0, Math.min(cap, 3 + round));
+    const fx = this.contractFx;
+    return Math.max(0, base + (fx && round >= (fx.incomeFromRound ?? 1) ? fx.incomeAdd : 0));
   }
 
   chessPrice(id) {
@@ -417,7 +423,7 @@ export class GameData {
    *   3. `DEFAULTS.deployCap`（一份被裁过的 data 也还能开局）。
    * 没有口径、也没有数据时逐字回到今天那条：`posIntOr(economy.deployCap, DEFAULTS.deployCap)`。
    */
-  get deployCap() { return this._deployCap ?? posIntOr(this.economy.deployCap, DEFAULTS.deployCap); }
+  get deployCap() { return Math.max(1, (this._deployCap ?? posIntOr(this.economy.deployCap, DEFAULTS.deployCap)) + (this.contractFx?.deployCapAdd || 0)); }
   get equipPerChess() { return posIntOr(this.economy.equipPerChess, DEFAULTS.equipPerChess); }
 
   /**
@@ -499,15 +505,24 @@ export class GameData {
   get isRecon() { return /^mode_recon_/.test(this.modeId || ''); }
   get difficulty() { return this.mode.difficulty || (this.modeId ? String(this.modeId).split('_').pop().toUpperCase() : 'NORMAL'); }
   get lastRound() {
+    if (this.contractFx?.pact) return this.contractFx.pact.maxRounds;
     if (Number.isInteger(this.mode.lastRound) && this.mode.lastRound > 0) return this.mode.lastRound;
     return this.modeId === 'mode_single_funny' ? 9 : 14;
   }
-  get bossRound() { return Number.isInteger(this.mode.bossRound) && this.mode.bossRound > 0 ? this.mode.bossRound : this.lastRound; }
-  get hiddenRound() { return Number.isInteger(this.mode.hiddenRound) && this.mode.hiddenRound > 0 ? this.mode.hiddenRound : null; }
-  get maxShopLevel() { return posIntOr(this.mode.maxShopLevel, DEFAULTS.maxShopLevel); }
+  get baseBossRound() { return Number.isInteger(this.mode.bossRound) && this.mode.bossRound > 0 ? this.mode.bossRound : (this.mode.lastRound || 14); }
+  get bossRound() { return this.contractFx?.pact
+    ? Math.max(...this.contractFx.pact.bossRounds.map((b) => b.round)) : this.baseBossRound; }
+  get hiddenRound() { return this.contractFx?.pact
+    ? (this.bossRound < this.contractFx.pact.maxRounds ? this.contractFx.pact.maxRounds : this.contractFx.pact.maxRounds + 1)
+    : (Number.isInteger(this.mode.hiddenRound) && this.mode.hiddenRound > 0 ? this.mode.hiddenRound : null); }
+  isBossRound(round) { return this.contractFx?.pact ? this.contractFx.pact.bossRounds.some((b) => b.round === round) : round === this.bossRound; }
+  get maxShopLevel() { return Math.min(posIntOr(this.mode.maxShopLevel, DEFAULTS.maxShopLevel), this.contractFx?.maxShopLevel ?? Infinity); }
 
   roundCfg(r) {
     const rounds = this.mode.rounds;
+    if (this.contractFx?.pact && this.isBossRound(r)) r = this.baseBossRound;
+    else if (this.contractFx?.pact && r >= this.baseBossRound && r !== this.hiddenRound) r = this.baseBossRound - 1;
+    else if (this.contractFx?.pact && r === this.hiddenRound) r = this.mode.hiddenRound || this.baseBossRound + 1;
     return rounds && typeof rounds === 'object' && rounds[String(r)] && typeof rounds[String(r)] === 'object' ? rounds[String(r)] : null;
   }
 
@@ -692,7 +707,7 @@ export class GameData {
 
   startLp(bandId) {
     const b = this.band(bandId);
-    return b && Number.isInteger(b.totalHp) && b.totalHp > 0 ? b.totalHp : this.defaultStartLp;
+    return Math.max(1, (b && Number.isInteger(b.totalHp) && b.totalHp > 0 ? b.totalHp : this.defaultStartLp) + (this.contractFx?.startLpAdd || 0));
   }
 
   /**

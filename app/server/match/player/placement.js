@@ -64,6 +64,14 @@ export class PlayerPlacement {
    */
   _legal(piece, r, c, owner = null) {
     const dmap = this.deployMap();     // also refreshes `_deployField` (the field that map was built for)
+    const fx = this.m?.contractFx;
+    if (piece?.kind === 'chess') {
+      const rec = this.gd.chess(piece.id);
+      if (fx?.noRangedTiles && dmap.get(tileKey(r, c)) === 'ranged') return false;
+      if (fx?.banProfessions.includes('术师') && rec?.profession === 'CASTER') return false;
+      if (fx?.banProfessions.includes('医疗') && rec?.profession === 'MEDIC') return false;
+      if (fx?.banProfessions.includes('重装') && rec?.profession === 'TANK') return false;
+    }
     if (!canPlace(dmap, this._placementOf(piece), r, c, this.m && this.m.layout, this._deployField)) return false;
     const k = tileKey(r, c);
     const range = this.summonRange(piece, owner);

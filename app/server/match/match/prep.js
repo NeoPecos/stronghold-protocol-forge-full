@@ -11,6 +11,7 @@ import { DELAYS } from './common.js';
 export class MatchPrep {
   enterPrep() {
     this.phase = PHASE.PREP;
+    this.speedVote = null;
     this.sp = null;
     const alive = this.alivePlayers();
     for (const ps of alive) {
@@ -192,6 +193,7 @@ export class MatchPrep {
 
   endPrep() {
     if (this.phase !== PHASE.PREP) return;
+    this.speedVote = null;
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended
     this._cancelRehearsal();
@@ -200,7 +202,7 @@ export class MatchPrep {
     for (const ps of alive) this.dispatch(ps, 'onPrepEnd', { round: this.round });
     for (const ps of alive) ps.endPrep();
     const r = this.round;
-    if (r === this.gd.bossRound || r === this.devBossRound) {
+    if (this.gd.isBossRound(r) || r === this.devBossRound) {
       this.hiddenLayerSum = alive.reduce((s, p) => s + p.activatedLayers(), 0);
       this.startFinalAssault(false);
     } else if (r === this.gd.hiddenRound) {

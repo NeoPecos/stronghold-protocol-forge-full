@@ -408,7 +408,7 @@ export class MatchPhases {
     this.devRoundKind = null;
     // 强制首领：记下「这一个回合号是首领回合」（endPrep / _planBossWaves / m.public 都按这个号判定）；强制普通则清掉覆盖
     this.devBossRound = forcedKind === 'boss' ? r : null;
-    const isBoss = forcedKind ? forcedKind === 'boss' : (r === this.gd.bossRound || r === this.gd.hiddenRound);
+    const isBoss = forcedKind ? forcedKind === 'boss' : (this.gd.isBossRound(r) || r === this.gd.hiddenRound);
     if (isBoss) {
       this._planBossWaves();
     } else {

@@ -45,6 +45,7 @@ import { UnofficialMark, ruleLine } from './pluginTag.js';
 import { RATE_STEPS } from '../battle/runner.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { TestMark } from './testConsole.js';
+import { ContractsViewButton } from './contracts.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -451,20 +452,21 @@ export function PauseButton({ paused, busy = false, onToggle }) {
 /**
  * 战斗倍速按钮（×1 / ×2 / ×3 / ×4 循环）。
  *
- * **纯本地播放选择**：同一段确定的 tick 序列只是推进得更快，因此**战果一字不变** —— 这一条由
- * `public/js/battle/runner.js` 的 `setRate` 保证（倍速只改「墙钟 → tick」的映射，`test/match/runner.test.js`
- * 用「4× 与 1× 跑完后 `b.result` 逐字节相同」钉住它）。服务端在 `b.start` 里给的 `speed` 是**对局**节奏，
- * 这里改的是**这台机器看得多快**，两者相乘，服务端不参与、也不需要参与。
- *
- * 与「暂停」的区别（原件注释同一条）：暂停是服务端往返（单人对局），倍速不是。
+ * 休整期发起投票，所有仍在场的真人同意后由服务端调整下一场战斗的时钟。
+ * 顶栏始终显示服务端实际倍速，避免本地播放与服务端倒计时不一致。
  * @param {{ speed?: number|null, onSpeed: (next: number) => void }} props
  */
-export function SpeedButton({ speed, onSpeed }) {
-  const cur = RATE_STEPS.includes(Number(speed)) ? Number(speed) : 1;
+export function SpeedButton({ speed, onSpeed, vote = null, myId = null, canVote = false }) {
+  const cur = RATE_STEPS.includes(Number(speed)) ? Number(speed) : 2;
   const next = RATE_STEPS[(RATE_STEPS.indexOf(cur) + 1) % RATE_STEPS.length];
-  return html`<${Tooltip} text=${t('战斗倍速 {cur}× · 点击切到 {next}×（只加快播放，结果不变）', { cur, next })} placement="bottom">
+  const target = vote?.target || next;
+  const agreed = !!vote?.agreed?.includes(myId);
+  const tip = !canVote ? t('当前战斗为 {cur}×；休整期可发起全员倍速投票', { cur })
+    : vote ? t('申请 {target}×：已同意 {count}/{total} 人', { target, count: vote.agreed.length, total: vote.voters.length })
+      : t('当前战斗为 {cur}×；点击申请 {next}×，全员同意后生效', { cur, next });
+  return html`<${Tooltip} text=${tip} placement="bottom">
     <button type="button" class="speedbtn tapx" aria-label=${t('战斗倍速 {cur}×', { cur })}
-        data-testid="speed" onClick=${() => onSpeed?.(next)}><span class="num">${cur}×</span></button>
+        data-testid="speed" disabled=${!canVote || agreed} onClick=${() => onSpeed?.(target)}><span class="num">${vote ? `${target}× ${vote.agreed.length}/${vote.voters.length}` : `${cur}×`}</span></button>
   <//>`;
 }
 
@@ -519,6 +521,8 @@ export const TopBar = modComponent('game.hud.topBar', function TopBar({ pub, pri
           : pub?.difficulty ? html`<${DifficultyTag} difficulty=${pub.difficulty} size="sm" />` : null}
         ${pub?.test ? html`<${TestMark} class="gtop__test" />` : null}
         <${UnofficialMark} room=${room} compact=${true} class="gtop__mod" />
+        <${ContractsViewButton} contracts=${pub?.contracts} points=${pub?.contractPoints}
+          difficulty=${pub?.difficulty} />
         ${ruleLine(room?.content?.rules) ? html`<span class="gtop__rules" data-testid="plugin-rules">${ruleLine(room?.content?.rules)}</span>` : null}
       </div>
     </div>
@@ -553,7 +557,7 @@ export const TopBar = modComponent('game.hud.topBar', function TopBar({ pub, pri
           ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
           : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}
-        ${onSpeed ? html`<${SpeedButton} speed=${speed} onSpeed=${onSpeed} />` : null}
+        ${onSpeed ? html`<${SpeedButton} speed=${speed} onSpeed=${onSpeed} vote=${pub?.speedVote} myId=${myId} canVote=${!spectator && (phase === PHASE.PREP || playerCount <= 1)} />` : null}
       </div>
       <${OvertimeWarning} ot=${ot} />
       ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}

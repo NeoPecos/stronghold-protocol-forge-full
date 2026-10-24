@@ -207,6 +207,7 @@
 //                    fail, BOSS_CLOCK_MS)
 
 import { PHASE, modeIdFor, bossHitLimitFrom, MAX_SEATS } from '../../shared/constants.js';
+import { contractEffects } from '../../shared/contractEffects.js';
 // 变体 / 口径层（DESIGN §28.39）：本局的轴表由各包的归一化声明合成，规则就是既有的「包 id 字典序小的赢」。
 import { mergeVariantDecls, variantValue } from '../../shared/variants.js';
 // 行为开关层（DESIGN §28.43）：同一张合成规则（包 id 小的赢），另一张表。空数组 ⇒ 每一格的读取点走缺省路径。
@@ -297,6 +298,8 @@ export class Match {
     this.roomCode = opts.roomCode ?? '----';
     this.mode = opts.mode === 'solo' ? 'solo' : 'coop';
     this.difficulty = opts.difficulty;
+    this.contracts = Array.isArray(opts.contracts) ? [...opts.contracts] : [];
+    this.contractFx = contractEffects(this.contracts);
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
     /**
      * 开发者模式（工坊包 dev-ext 的「全量模拟」，`room.create.dev`）：`dev` 让这一局**跳过 INFO_CHECK / BAND_DRAFT**
@@ -351,6 +354,8 @@ export class Match {
      * @type {{ digest: string, packs: Array<object> }|null}
      */
     this.mods = opts.mods && typeof opts.mods === 'object' && typeof opts.mods.digest === 'string' ? opts.mods : null;
+    /** Whether this match must load its materialised room data even when its digest equals the welcome digest. */
+    this.roomData = opts.roomData === true;
     /** @type {Array<{ axis: string, default: string, by: string }>} */
     this.variants = mergeVariantDecls(this.mods && Array.isArray(this.mods.packs) ? this.mods.packs : []).decl;
     /**
@@ -385,6 +390,7 @@ export class Match {
     this.eliteForm = isEliteForm(variantValue(this.variants, 'form'));
     this.formView = formView(this.data && this.data.chess, this.eliteForm, { tokens: this.data && this.data.tokens });
     this.gd = new GameData(this.data, this.modeId, {
+      contractFx: this.contractFx,
       ...(this.seatCap ? { seatCap: this.seatCap } : {}),
       // 本局的口径（DESIGN §28.39）。空数组 = 没有包声明口径 ⇒ `GameData` 一个字节都不动。
       variants: this.variants,
@@ -425,6 +431,7 @@ export class Match {
     this.uniteHelpers = this.extendedUnite && Number.isInteger(opts.uniteHelpers)
       && opts.uniteHelpers >= 2 && opts.uniteHelpers % 2 === 0 && opts.uniteHelpers <= uniteLimit
       ? opts.uniteHelpers : 2;
+    if (this.contractFx.uniteMaxHelpers != null) this.uniteHelpers = Math.min(this.uniteHelpers, this.contractFx.uniteMaxHelpers);
     this.uniteTimeBonus = this.extendedUnite ? (uniteLimit - this.uniteHelpers) / 2 * 10 : 0;
     /**
      * 限伤 override for this match's battles (`SP_BOSS_HIT_LIMIT`, shared/constants.js bossHitLimitFrom; opts wins).
@@ -544,6 +551,7 @@ export class Match {
     this._battleSeq = 0;
     /** solo pause (g.pause, DESIGN §14): the field clocks / deadlines are frozen while true (m.public.paused) */
     this.paused = false;
+    this.speedVote = null;
     this._pausedAt = 0;
     /** real ms spent paused this match (diagnostics) */
     this.pausedMs = 0;

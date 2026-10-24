@@ -234,7 +234,7 @@ export function seamOfDeployRects(rects, size) {
  * @param {readonly number[]} size
  * @param {number} [seam]
  * @param {{ rows?: number, cols?: number, normalMargin?: number }} [board]
- * @returns {{ size: number[], deployRects: Record<string, number[]>, battle: Record<string, object>, pen: object, mirrorCol: number }}
+ * @returns {{ size: number[], deployRects: Record<string, number[]>, battle: Record<string, object>, pen: object, penRight?: object, mirrorCol: number }}
  */
 export function layoutForSize(size, seam = DEFAULT_SEAM, board = DEFAULT_BOARD, dual = false) {
   const [R, C] = clampSize(size);
@@ -314,6 +314,7 @@ export function normalizeLayout(v, size) {
     normalMargin: DEFAULT_BOARD.normalMargin,
   };
   const base = layoutForSize(win, seam, shape, dual);
+  /** @type {any} Optional penRight is present only on dual-field layouts. */
   const out = { size: base.size, deployRects: {}, battle: {}, pen: base.pen, mirrorCol: base.mirrorCol };
   if (base.penRight) out.penRight = base.penRight;
   for (const key of Object.keys(base.deployRects)) {
@@ -409,8 +410,10 @@ export function boardRectOf(layout, field = 'normal') {
 }
 
 /** 一张图的**整备行**（`hand` 那 10 格站的那一行）在棋盘坐标里是第几行：棋盘最下面那一行再往上两行。 */
+/** @param {object|null|undefined} layout @param {'normal'|'normalL'|'normalR'|'bossL'|'bossR'} [field] */
 export const handRowOf = (layout, field = 'normal') => boardRectOf(layout, field).r0 - 2;
 /** **临时整备区**那一行（`temp` 的 5 个可见格）：整备行的上一行。 */
+/** @param {object|null|undefined} layout @param {'normal'|'normalL'|'normalR'|'bossL'|'bossR'} [field] */
 export const tempRowOf = (layout, field = 'normal') => boardRectOf(layout, field).r0 - 1;
 
 /**

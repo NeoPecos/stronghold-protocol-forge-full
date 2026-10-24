@@ -228,7 +228,10 @@ export class BattlePlayers {
       uid: extra.uid ?? null, ownerUnit: extra.ownerUnit ?? null, skin: extra.skin ?? null, x: c, y: r, tileR: r, tileC: c,
       dir: extra.dir != null ? normDir(extra.dir) : extra.facing != null ? normDir(extra.facing) : ps ? ps.dir : 'RIGHT',
       base: {
-        maxHp: st.maxHp, atk: st.atk, def: st.def, res: st.res, aspd: st.aspd, bat: st.bat, blockCnt: st.blockCnt,
+        maxHp: st.maxHp * (kind === 'op' ? (this.contractMods?.opStatMul?.hp ?? 1) : 1),
+        atk: st.atk * (kind === 'op' ? (this.contractMods?.opStatMul?.atk ?? 1) : 1),
+        def: st.def * (kind === 'op' ? (this.contractMods?.opStatMul?.def ?? 1) : 1),
+        res: st.res, aspd: st.aspd, bat: st.bat, blockCnt: st.blockCnt,
         moveSpeed: 0, spRecovery: st.spRecovery, tauntLevel: st.tauntLevel, massLevel: st.massLevel,
         hpRecoveryPerSec: st.hpRecoveryPerSec, cost: st.cost, respawnTime: st.respawnTime,
       },

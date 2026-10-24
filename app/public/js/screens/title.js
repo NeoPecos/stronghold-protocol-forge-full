@@ -27,6 +27,7 @@ import { NAME_MAX_LEN, UPSTREAM_VERSION, DEV_BUILD } from '../../../shared/const
 import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/components.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
+import { AnnouncementButton } from '../ui/announcements.js';
 import { toast } from '../ui/toasts.js';
 import { net, identity, saveAccountAuth } from '../net.js';
 import { store, useStore, shallowEqual } from '../store.js';
@@ -271,6 +272,7 @@ export function TitleScreen() {
     <div class="title-corner title-corner--tr">
       <div>
         <div class="title-corner__tools">
+          <${AnnouncementButton} class="title-announcements" />
           <${Button} variant="ghost" size="sm" icon="chart" class="title-stats" onClick=${openStats} title=${t('统计数据')}>${t('统计')}<//>
           <${NoticesButton} onOpen=${() => setNoticesOpen(true)} />
           <${ResourceButton} onOpen=${() => setResourcesOpen(true)} />

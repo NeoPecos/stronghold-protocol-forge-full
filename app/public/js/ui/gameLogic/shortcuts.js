@@ -196,10 +196,10 @@ export function facingEnter(e, chosen) {
  * right-click or long press — or a battle / teammate unit). Shop, reward, bond-member and intel (enemy) cards stay.
  * @param {{ kind?: string }|null|undefined} detail
  */
-// a card opened BY a field press (a piece, a unit, a special terrain tile: issue #184, a stage device: #228) closes on the
-// next press of the field; the ones opened from the shop / hand / HUD stay until their own close button (or the flow that
-// opened them)
-export const closesOnFieldPress = (detail) => detail?.kind === 'piece' || detail?.kind === 'unit' || detail?.kind === 'terrain' || detail?.kind === 'device';
+// a press on the field deselects and closes the open detail card — EVERY kind of card, including the ones opened from the
+// shop / hand / HUD / a foreign board / an enemy: the maintainer asked for «点空白处弹窗自动关闭» (2026-10-23, the main
+// server shipped the same change)
+export const closesOnFieldPress = (detail) => !!detail;
 
 /**
  * Whether an open overlay swallows a game shortcut: a modal / the guide own the keyboard (Esc included — they close

@@ -1392,7 +1392,7 @@ export function createBattleRunner(deps) {
  * @returns {string}
  */
 function dataBaseForBattle(spec) {
-  return roomDataBase(spec && spec.mods, currentModSet());
+  return roomDataBase(spec && spec.mods, currentModSet(), spec?.roomData === true);
 }
 
 /** The browser runner, wired to the app's socket and store (null outside a browser). */

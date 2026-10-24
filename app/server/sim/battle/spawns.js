@@ -124,7 +124,8 @@ export class BattleSpawns {
     });
     e.alive = true;
     e.deployed = true;
-    e.blockWeight = def.blockCnt ?? 1;
+    e.blockWeight = Math.min(Number.isFinite(opts.mods?.contractBlockMax) ? opts.mods.contractBlockMax : 3,
+      (def.blockCnt ?? 1) + (Number.isFinite(opts.mods?.contractBlockAdd) ? opts.mods.contractBlockAdd : 0));
     e.hitArea = def.hitArea ?? null;   // 巨型单位 hit rectangle (body.js); null = a point
     e.lpr = def.lpr;
     e.mods = opts.mods ?? null;

@@ -31,6 +31,7 @@
 | 改工坊编辑器 | [EDITOR.md](EDITOR.md) |
 | 加语言、改界面文案 | [I18N.md](I18N.md) |
 | 改数值与平衡 | [BALANCE.md](BALANCE.md) · [PLAYING.md](PLAYING.md) |
+| 改危机合约 | [design/crisis-contracts.md](design/crisis-contracts.md) — 网站词条、房间选择、对局效果 |
 | 动生成的游戏数据 | [DATA.md](DATA.md) — **永不手改** `data/*.json` |
 | 部署、打包、发版 | [DEPLOY.md](DEPLOY.md) · [WINDOWS.md](WINDOWS.md) · [UPSTREAM-UPGRADE.md](UPSTREAM-UPGRADE.md) |
 | **打发行包、发 release** | [BUILD-RECORD.md](BUILD-RECORD.md) — 发版八步、四个资产的产出命令、踩过的坑、历史版本的实测基线 |

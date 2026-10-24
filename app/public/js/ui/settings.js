@@ -480,6 +480,11 @@ function OtherSkinsRow({ value, onSet }) {
  * Settings modal.
  * @param {{ open: boolean, onClose: Function }} props
  */
+/** 收起（2026-10-24）：a5 当前部署里没有任何包注册外观提供者或声明素材镜像，
+ *  这两个开关对画面没有任何可观察效果。设置项先收起来，代码与其设置值保留，
+ *  等有包真的导出 appearance(ctx) / assets.mirrors[] 再放开。 */
+const SHOW_WORKSHOP_SWITCHES = false;
+
 export function SettingsModal({ open, onClose }) {
   const s = useSettings();
   const [tested, setTested] = useState(false);
@@ -518,10 +523,14 @@ export function SettingsModal({ open, onClose }) {
       <p class="set-hint">${t('弹药类技能开启时，在弹药条下方显示剩余弹药 / 总弹药数（如 13/14）；秘术师的血条下方显示储存的攻击能量 / 上限（如 2/3）。官方界面没有这些数字。')}</p>
       <${Toggle} label=${t('作战统计')} micro="COMBAT STATS" value=${s.combatMetrics} onChange=${(v) => updateSettings({ combatMetrics: v })} />
       <p class="set-hint">${t('打开后，对局左下角可以查看自己干员的伤害、治疗和 DPS / HPS。官方界面没有这个窗口。改变玩法的插件对局在 Worker 里演算，统计不到，按钮不显示。')}</p>
-      <${Toggle} label=${t('工坊外观')} micro="WORKSHOP SKINS" value=${s.workshopSkins} onChange=${(v) => updateSettings({ workshopSkins: v })} />
-      <p class="set-hint">${t('工坊外观由已加载的包提供，缺哪一套时回落原版立绘。')}</p>
-      <${Toggle} label=${t('工坊素材源')} micro="WORKSHOP LOAD SOURCES" value=${s.workshopSources} onChange=${(v) => updateSettings({ workshopSources: v })} />
-      <p class="set-hint">${t('工坊素材源由已加载的包声明；关掉后一律从包内取。')}</p>
+      <${Toggle} label=${t('拖动干员时收起商店')} micro="FOLD SHOP ON DRAG" value=${s.prepDeployFold} onChange=${(v) => updateSettings({ prepDeployFold: v })} />
+      <p class="set-hint">${t('休整期拖动干员准备部署时，暂时收起底部商店，松开后恢复。')}</p>
+      ${SHOW_WORKSHOP_SWITCHES ? html`
+        <${Toggle} label=${t('工坊外观')} micro="WORKSHOP SKINS" value=${s.workshopSkins} onChange=${(v) => updateSettings({ workshopSkins: v })} />
+        <p class="set-hint">${t('工坊外观由已加载的包提供，缺哪一套时回落原版立绘。')}</p>
+        <${Toggle} label=${t('工坊素材源')} micro="WORKSHOP LOAD SOURCES" value=${s.workshopSources} onChange=${(v) => updateSettings({ workshopSources: v })} />
+        <p class="set-hint">${t('工坊素材源由已加载的包声明；关掉后一律从包内取。')}</p>
+      ` : null}
       <div class="set-row">
         <span class="set-row__label">${t('画面质量')}<${MicroLabel}>QUALITY<//></span>
         <div class="set-seg" role="radiogroup">

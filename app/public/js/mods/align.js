@@ -42,12 +42,13 @@ export function setStore(next) { store = next || null; }
  * ticked nothing) this returns `/data/` and the loader is byte-for-byte the one that always ran.
  * @param {{ digest?: string }|null|undefined} mods a BattleSpec's / room's mod set
  * @param {{ digest?: string }|null|undefined} welcomeMods the process set from `welcome`
+ * @param {boolean} [forceRoom] whether this deployment keeps its shared /data face separate from room content
  * @returns {string}
  */
-export function roomDataBase(mods, welcomeMods) {
+export function roomDataBase(mods, welcomeMods, forceRoom = false) {
   const digest = mods && typeof mods.digest === 'string' ? mods.digest : '';
   const process = welcomeMods && typeof welcomeMods.digest === 'string' ? welcomeMods.digest : '';
-  if (!DIGEST_RE.test(digest) || digest === process) return DATA_PREFIX;
+  if (!DIGEST_RE.test(digest) || (!forceRoom && digest === process)) return DATA_PREFIX;
   return `${ROOM_DATA_PREFIX}${digest}/`;
 }
 

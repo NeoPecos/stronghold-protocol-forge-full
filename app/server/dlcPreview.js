@@ -5,8 +5,11 @@ import { applyWorkshop } from '../shared/workshop.js';
 import { DLC_PACKS, DLC_IDS } from '../shared/dlc.js';
 
 const SKIP = new Set(['assets', 'descRaw', 'chessId', 'baseId', 'goldenId', 'identifier']);
+const BOND_MEMBERSHIP = Object.freeze(['members', 'visibleMembers']);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const own = (value, key) => value && Object.hasOwn(value, key);
+const withoutBondMembership = (bond) => Object.fromEntries(Object.entries(bond || {})
+  .filter(([key]) => !BOND_MEMBERSHIP.includes(key)));
 
 export function changedFields(before, after, prefix = '') {
   if (same(before, after)) return [];
@@ -49,17 +52,33 @@ export function buildDlcPreview(official, loadedPacks, kitOwners = new Map()) {
       if (original && !fields.length && !kit) continue;
       (byChess[id] ||= []).push({ pack: definition.id, added: !original, kit, fields });
     }
-    // A pack may change an existing bond's effect without touching its members'
-    // chess records. Show that rule beside every operator that belongs to it.
+    // A pack may change an existing bond without touching its members' chess records. Rule/effect changes belong beside
+    // every member. A members-list-only override belongs beside the operators whose membership actually changed; adding
+    // one new member must not badge every existing member as belonging to that DLC (for example ordinary Angelina remains
+    // a Siracusa operator when Rim Billiton adds Angelina the Desireful to the same Siracusa bond).
     for (const [bondId, bond] of Object.entries(variant.bonds || {})) {
       const originalBond = base.bonds?.[bondId];
       if (!originalBond) continue;
-      const fields = changedFields(originalBond, bond).map((field) => ({
+      const ruleFields = changedFields(withoutBondMembership(originalBond), withoutBondMembership(bond)).map((field) => ({
         ...field, bondId, path: field.path,
       }));
-      if (!fields.length) continue;
-      for (const [id, rec] of Object.entries(variant.chess || {})) {
-        if (!rec?.bonds?.includes(bondId) && !base.chess?.[id]?.bonds?.includes(bondId)) continue;
+      const affected = new Set([...BOND_MEMBERSHIP.flatMap((key) => [
+        ...(Array.isArray(originalBond[key]) ? originalBond[key] : []),
+        ...(Array.isArray(bond[key]) ? bond[key] : []),
+      ])]);
+      if (ruleFields.length) {
+        for (const [id, rec] of Object.entries(variant.chess || {}))
+          if (rec?.bonds?.includes(bondId) || base.chess?.[id]?.bonds?.includes(bondId)) affected.add(id);
+      }
+      for (const id of affected) {
+        if (!variant.chess?.[id] && !base.chess?.[id]) continue;
+        const fields = [...ruleFields];
+        for (const key of BOND_MEMBERSHIP) {
+          const before = Array.isArray(originalBond[key]) && originalBond[key].includes(id);
+          const after = Array.isArray(bond[key]) && bond[key].includes(id);
+          if (before !== after) fields.push({ bondId, path: key, before, after });
+        }
+        if (!fields.length) continue;
         const entries = (byChess[id] ||= []);
         const entry = entries.find((item) => item.pack === definition.id);
         if (entry) entry.fields.push(...fields);

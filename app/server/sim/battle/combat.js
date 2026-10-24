@@ -11,7 +11,9 @@ export class BattleCombat {
   }
 
   heal(source, target, amount, opts = {}) {
-    try { return pipeHeal(this, source, target, amount, opts); } catch (e) { this._internalError('heal', e); return 0; }
+    const effective = source?.kind === 'op' && source?.def?.profession === 'MEDIC'
+      ? amount * (this.contractMods?.healMul ?? 1) : amount;
+    try { return pipeHeal(this, source, target, effective, opts); } catch (e) { this._internalError('heal', e); return 0; }
   }
 
   /**

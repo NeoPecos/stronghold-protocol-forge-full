@@ -10,7 +10,7 @@
 怎么把层数与成员堆起来」展开，配套的特质/装备（发放干员、加层、复刻战斗中效果）都在服务这个循环。
 
 **元数据**：`id: rimbilliton`，显示名「雷姆必拓」，包版本 `1.3.0`，作者 `the Rim Billiton mod`，`license: GPL-3.0-or-later`，
-`gameVersion: 0.3.1`，`combat: true`，`stripDiyOverlaps: true`（本包做成棋子的干员会从**自选编队池**里摘除，
+`gameVersion: 0.2.6`（本仓库引擎为 0.2.6），`combat: true`，`stripDiyOverlaps: true`（本包做成棋子的干员会从**自选编队池**里摘除，
 避免同一干员同时以棋子与自选条目两种身份出现而效果重复）。**未声明任何前置包**：它的核心盟约 `bondType` 是 `SEASON`（非 `SIDE_STORY`），
 与 `workshop/side-story/` 那套故事集接口**无关**。存在一处**跨包软耦合**：盟约成员含 `chess_char_5_25_a`（若叶睦），该棋子由
 `workshop/ave-mujica/` 定义、但共用本包素材；策略文案自带说明「在【雷姆必拓】部分干员缺席时体验可能不完整」。
@@ -103,7 +103,7 @@
 
 | id | 名字 | 阶级 | charId | 盟约 | 特质（`garrisonIds`） |
 |---|---|---|---|---|---|
-| `chess_char_1_21_a/b` | 霜叶 | 1 | `char_193_frostl` | rimBilliton | `garrison_169_a/b` |
+| `chess_char_1_22_a/b` | 霜叶 | 1 | `char_193_frostl` | rimBilliton | `garrison_169_a/b` |
 | `chess_char_2_20_a/b` | 暴行 | 2 | `char_230_savage` | rimBilliton | `garrison_167_a/b` + `garrison_167_prep_a/b` |
 | `chess_char_2_21_a/b` | 蜜莓 | 2 | `char_449_glider` | rimBilliton, deputShip | `garrison_168_a/b` |
 | `chess_char_3_22_a/b` | 黑 | 3 | `char_340_shwaz` | rimBilliton, visiShip, columbiaShip | `garrison_166_a/b` |
@@ -229,7 +229,7 @@
 
 ### 7.3 干员 / 召唤物 kit（`kits/*.js`，9 份）
 
-- **干员 kit（8 份）**：`chess_char_1_21_a.js`（霜叶，tier1 手写）、`chess_char_2_20_a.js`（暴行，tier2 手写）、`chess_char_2_21_a.js`（蜜莓，tier2 手写）、
+- **干员 kit（8 份）**：`chess_char_1_22_a.js`（霜叶，tier1 手写）、`chess_char_2_20_a.js`（暴行，tier2 手写）、`chess_char_2_21_a.js`（蜜莓，tier2 手写）、
   `chess_char_3_22_a.js`（黑 → 复用 `@ops/op-shwaz.js`）、`chess_char_4_27_a.js`（阿米娅，手写）、`chess_char_5_24_a.js`（莱伊 → 复用 `@ops/op-ray.js`）、
   `chess_char_6_21_a.js`（予愿安洁莉娜 → 复用 `@ops/op-aglna2.js`）、`chess_char_6_22_a.js`（珊比 → 复用 `@ops/op-thumpy.js`）。
   复用型 kit 的惯例：把**默认技能**从 `skills` 挪到顶层 `skill`，并按卡池数据修正触发规则（如 S2/S3 的 `ACTIVE_RANGE`）。
@@ -310,7 +310,7 @@ workshop/rimbilliton/
 ├── battle/main.mjs                # server.battle：盟约 installer + 特质 installer/reader + 装备行为
 ├── meta/main.mjs                  # server.meta：拓大地 band + 3 个休整期特质处理器
 ├── kits/                          # 9 份 kit
-│   ├── chess_char_1_21_a.js       #   霜叶
+│   ├── chess_char_1_22_a.js       #   霜叶
 │   ├── chess_char_2_20_a.js       #   暴行
 │   ├── chess_char_2_21_a.js       #   蜜莓
 │   ├── chess_char_3_22_a.js       #   黑（复用 @ops/op-shwaz.js）

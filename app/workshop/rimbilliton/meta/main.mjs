@@ -63,34 +63,42 @@ export function registerMeta(registry) {
   };
 
   // 暴行 (休整期发放): 上场战斗未陷入过再部署状态（未被击倒 / 退场）→ 获得N名阶级不超过调度中心的【雷姆必拓】干员。
-  // 标记来自通用通道（战斗侧 `setBattleMark(battle, pid, 'noRedeploy', <defId|null>)`）。
+  // 标记来自通用通道，数值是暴行本人及莱伊复制出的每个成功效果实例的奖励总和。同一玩家即使有多个暴行的
+  // SERVER_PREP_START 特质，也只能统一消费一次。
   const grantNoRedeployChar = (ctx) => {
     const mark = ctx.mark('noRedeploy');
-    if (typeof mark !== 'string' || !mark) return;
-    const n = Math.max(1, num(ctx.source.bb.count, 1));
-    for (let i = 0; i < Math.min(10, n); i++) {
+    const n = typeof mark === 'number' && Number.isFinite(mark)
+      ? Math.min(10, Math.max(0, Math.trunc(mark)))
+      : (typeof mark === 'string' && mark ? Math.min(10, Math.max(1, num(ctx.source.bb.count, 1))) : 0);
+    if (!(n > 0)) return;
+    if (ctx.counter('rimbilliton:noRedeployRound') === ctx.round) return;
+    ctx.setCounter('rimbilliton:noRedeployRound', ctx.round);
+    for (let i = 0; i < n; i++) {
       const id = ctx.rollChess({ bond: 'rimBilliton', maxTier: ctx.shopLevel() });
       if (!id || !ctx.grantChess(id)) break;
     }
   };
 
-  // 蜜莓 "场上每有1名不同的雷姆必拓干员，使所有已激活的层数+N"（无需激活盟约，加给所有已激活盟约）。
+  // 蜜莓：收集场上不同雷姆必拓干员拥有且已激活的盟约，每个盟约只加一次。
+  // 例如霜叶、暴行、蜜莓都拥有雷姆必拓，雷姆必拓仍只 +N；蜜莓另有助力，但未激活时不加。
   const addActBondLayerByBoardBondChar = (ctx) => {
     const { bb, bbStr } = ctx.source;
     const bondId = ids(bbStr.bond_id)[0] || null;
     if (!bondId) return;
     const seen = new Set();
-    let n = 0;
+    const targets = new Set();
     for (const p of chessOnBoard(ctx)) {
       const base = (ctx.gd.baseIdOf ? ctx.gd.baseIdOf(p.id) : String(p.id).replace(/_b$/, '_a')) || p.id;
       if (seen.has(base)) continue;
       seen.add(base);
-      if (metaBonds(ctx, p).includes(bondId)) n++;
+      const bonds = metaBonds(ctx, p);
+      if (!bonds.includes(bondId)) continue;
+      for (const b of bonds) if (ctx.bondActive(b)) targets.add(b);
     }
-    if (!(n > 0)) return;
+    if (!targets.size) return;
     const count = num(bb.count, 1);
     if (!(count > 0)) return;
-    for (const b of bondOrder(ctx)) if (ctx.bondActive(b)) ctx.addLayers(b, n * count, { requireActive: false });
+    for (const b of bondOrder(ctx)) if (targets.has(b)) ctx.addLayers(b, count, { requireActive: false });
   };
 
   // 开拓大地 (band_kaituo)：无条件注册；参数（count / bond）在派发时从 ctx.gd 的 band 数据读（kaituoParams）

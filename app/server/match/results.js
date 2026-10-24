@@ -14,6 +14,7 @@
 
 import { bondList } from './bondsMeta.js';
 import { boardOrder } from './board.js';
+import { contractPoints } from '../../shared/contracts.js';
 
 const STAT_OF = {
   bossDamage: (ps) => ps.stats.bossDamage,
@@ -176,6 +177,10 @@ export function buildResult(m, outcome) {
     teamLp: m.teamLp != null ? Math.max(0, Math.round(m.teamLp)) : null,
     modeId: m.modeId,
     difficulty: m.difficulty,
+    ...(m.contracts?.length ? {
+      contracts: m.contracts.slice(),
+      contractPoints: contractPoints(m.contracts, m.difficulty),
+    } : {}),
     stageId: m.stageId,
     bossId: m.bossId,
     hiddenBossId: m.hiddenBossId,

@@ -1,5 +1,4 @@
 import { skinsStore, setSkins, SKINS_KEY } from '../ui/skins.js';
-import { SkinSection } from '../ui/skinPicker.js';
 // 干员调配 (Operator loadout, DESIGN §16): choose the equipped skill of every chess and the module of its elite before a
 // match (official rule: "开始游戏前无法调整干员的等级，但可调整其所携带的技能和模组"). A full-screen overlay opened
 // from the lobby, the room and the briefing (INFO_CHECK) — `openLoadout(from)` / <LoadoutButton/>; <LoadoutHost/> is
@@ -75,10 +74,59 @@ const dlcEntries = (preview, chess, golden) => {
 };
 const DLC_FIELD_NAMES = Object.freeze({
   stats: '数值', trait: '特性', talents: '天赋', skill: '技能', skills: '技能', modules: '模组', module: '模组',
-  bonds: '盟约', garrisonIds: '驻防', potDown: '潜能', bb: '效果参数', desc: '描述',
+  bonds: '盟约', members: '成员资格', visibleMembers: '公开成员资格', garrisonIds: '驻防', potDown: '潜能', bb: '效果参数', desc: '描述',
 });
 const dlcFieldName = (path) => path.split('.').map((part) => DLC_FIELD_NAMES[part] ? t(DLC_FIELD_NAMES[part]) : part).join(' · ');
-const dlcValue = (value) => value == null ? '—' : typeof value === 'string' ? value : JSON.stringify(value);
+const dlcChessName = (id) => data.get('chess')?.[id]?.name || id;
+const dlcBondName = (id) => data.lookup('bonds', id)?.name || id;
+const dlcJoinNames = (names, max = 6) => names.length > max
+  ? `${names.slice(0, max).join('、')} 等 ${names.length} 个` : names.join('、');
+const dlcPlain = (value) => value == null ? '—'
+  : value === true ? t('是') : value === false ? t('否')
+  : typeof value === 'number' ? String(value)
+  : typeof value === 'string' ? (/^chess_/.test(value) ? dlcChessName(value) : value)
+  : Array.isArray(value) ? `${value.length} 项`
+  : Object.keys(value).length
+    ? Object.entries(value).map(([key, inner]) => `${key}: ${dlcPlain(inner)}`).join('，')
+    : '—';
+const dlcFinalText = (path, value) => {
+  const root = String(path).split('.')[0];
+  if (root === 'bonds') return Array.isArray(value) ? (value.length ? value.map(dlcBondName).join('、') : '无') : dlcPlain(value);
+  if (root === 'members' || root === 'visibleMembers') return Array.isArray(value) ? `${value.length} 人` : dlcPlain(value);
+  return dlcPlain(value);
+};
+const dlcChangeText = (field) => {
+  const root = String(field.path || '').split('.')[0];
+  const label = dlcFieldName(root);
+  const before = field.before;
+  const after = field.after;
+  if (root === 'members' || root === 'visibleMembers') {
+    if (Array.isArray(before) || Array.isArray(after)) {
+      const b = Array.isArray(before) ? before : [];
+      const a = Array.isArray(after) ? after : [];
+      const added = a.filter((id) => !b.includes(id));
+      const removed = b.filter((id) => !a.includes(id));
+      const bits = [`${b.length} 人 → ${a.length} 人`];
+      if (added.length) bits.push(`新增 ${added.map(dlcChessName).join('、')}`);
+      if (removed.length) bits.push(`移除 ${removed.map(dlcChessName).join('、')}`);
+      return `${label}：${bits.join('，')}`;
+    }
+    if (after != null && before == null) return `${label}：新增 ${dlcChessName(String(after))}`;
+    if (before != null && after == null) return `${label}：移除 ${dlcChessName(String(before))}`;
+    return `${label}：${dlcPlain(before)} → ${dlcPlain(after)}`;
+  }
+  if (root === 'bonds') {
+    const b = Array.isArray(before) ? before.map(dlcBondName) : [];
+    const a = Array.isArray(after) ? after.map(dlcBondName) : [];
+    const added = a.filter((name) => !b.includes(name));
+    const removed = b.filter((name) => !a.includes(name));
+    let line = `${label}：${b.length ? b.join('、') : '无'} → ${a.length ? a.join('、') : '无'}`;
+    if (added.length) line += `（新增 ${added.join('、')}）`;
+    if (removed.length) line += `（移除 ${removed.join('、')}）`;
+    return line;
+  }
+  return `${label}：${dlcPlain(before)} → ${dlcPlain(after)}`;
+};
 const dlcValueAt = (record, path) => path.split('.').reduce((value, part) => {
   if (Array.isArray(value)) return value[Number(part) - 1];
   return value?.[part];
@@ -89,8 +137,7 @@ function DlcCompare({ chess, golden, preview, roomDlc }) {
   const ids = dlcEntries(preview, chess, golden);
   if (!ids.length) return html`<p class="lo-dlc__empty">${t('此干员没有已安装 DLC 的改动')}</p>`;
   return html`<section class="lo-dlc">
-    <p class="lo-dlc__intro">${roomDlc ? t('左侧为本体与公共包，右侧为各 DLC 单独加入后的变化。本房实际内容由开关决定。')
-      : t('大厅展示已安装 DLC 的独立预览；实际是否生效由房间开关决定。')}</p>
+    <p class="lo-dlc__intro">${t('下面写的是这个干员被改动的具体内容；是否生效看房间的 DLC 开关。')}</p>
     ${ids.map((id) => {
       const pack = DLC_PACKS.find((entry) => entry.id === id);
       const records = [
@@ -100,17 +147,22 @@ function DlcCompare({ chess, golden, preview, roomDlc }) {
       return html`<article class="lo-dlc__pack" key=${id}>
         <header><h3>${dlcName(id)}</h3><span class=${cx('lo-dlc__state', roomDlc && !roomDlc.includes(id) && 'is-off')}>
           ${roomDlc ? roomDlc.includes(id) ? t('本房已启用') : t('本房未启用') : t('大厅预览')}</span></header>
-        ${records.map((record) => html`<div class="lo-dlc__form">
-          <h4>${record.form}${record.added ? ` · ${t('DLC 专属干员')}` : ''}</h4>
-          ${record.added ? html`<p>${t('本体没有这个干员；仅在启用此 DLC 的房间中出现。')}</p>` : null}
-          ${record.fields.map((field) => html`<div class="lo-dlc__change">
-            <b>${field.bondId ? `${t('盟约')} · ${data.lookup('bonds', field.bondId)?.name || field.bondId} · ` : ''}${dlcFieldName(field.path)}</b>
-            <div class=${cx('lo-dlc__pair', roomDlc && 'has-final')}><div><small>${t('本体')}</small><p>${dlcValue(field.before)}</p></div>
-              <div><small>${dlcName(id)}</small><p>${dlcValue(field.after)}</p></div>
-              ${roomDlc ? html`<div><small>${t('本房最终')}</small><p>${dlcValue(dlcValueAt(field.bondId ? data.lookup('bonds', field.bondId) : record.current, field.path))}</p></div>` : null}</div>
-          </div>`)}
-          ${record.kit ? html`<p class="lo-dlc__kit">${t('此 DLC 还提供干员战斗逻辑；下面的包内容说明不等同于此干员的逐项效果。')}</p>` : null}
-        </div>`)}
+        ${records.map((record) => {
+          const lines = record.fields.map((field) => {
+            const finalValue = roomDlc
+              ? dlcValueAt(field.bondId ? data.lookup('bonds', field.bondId) : record.current, field.path)
+              : null;
+            return html`<li>
+              <b>${field.bondId ? `${t('盟约')} · ${dlcBondName(field.bondId)} · ` : ''}${dlcChangeText(field)}</b>
+              ${roomDlc ? html`<em>${t('本房最终')}：${dlcFinalText(field.path, finalValue)}</em>` : null}</li>`;
+          });
+          return html`<div class="lo-dlc__form">
+            <h4>${record.form}${record.added ? ` · ${t('DLC 专属干员')}` : ''}</h4>
+            ${record.added ? html`<p>${t('本体没有这个干员；仅在启用此 DLC 的房间中出现。')}</p>` : null}
+            ${lines.length ? html`<ul class="lo-dlc__lines">${lines}</ul>` : null}
+            ${record.kit ? html`<p class="lo-dlc__kit">${t('此 DLC 还替换了该干员的战斗逻辑（技能/模组），不只是上面的字段。')}</p>` : null}
+          </div>`;
+        })}
         ${pack ? html`<details class="lo-dlc__notes"><summary>${t('查看此 DLC 的战斗内容说明')}</summary>
           <ul>${pack.contents.map((line) => html`<li>${t(line)}</li>`)}</ul></details>` : null}
       </article>`;
@@ -441,14 +493,13 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
     </div>
     ${onConflict ? html`<${ConflictSwitch} conflicts=${conflicts} picks=${conflict} chess=${chess} golden=${golden} onPick=${onConflict} />` : null}
     <div class="lo-dtabs" role="tablist" aria-label=${t('调配项目')}>
-      ${[['skill', t('技能'), 'SKILL'], ['mod', t('模组'), 'MODULE'], ['stats', t('数值'), 'STATS'], ['dlc', t('DLC 对比'), 'DLC'], ['voice', t('语音'), 'VOICE'], ['skin', t('换装'), 'SKIN'], ['growth', t('培养'), 'GROWTH']]
+      ${[['skill', t('技能'), 'SKILL'], ['mod', t('模组'), 'MODULE'], ['stats', t('数值'), 'STATS'], ['dlc', t('DLC 对比'), 'DLC'], ['voice', t('语音'), 'VOICE'], ['growth', t('培养'), 'GROWTH']]
         .filter(([key]) => key !== 'mod' || !!golden).map(([key, label, en]) => html`<button key=${key} type="button" role="tab" aria-selected=${activeTab === key ? 'true' : 'false'}
           class=${cx('lo-dtab', activeTab === key && 'is-on')} onClick=${() => setTab(key)}>${label} <span class="lo-dtab__en num">${en}</span></button>`)}
     </div>
     <div class="lo-detail__body" ref=${bodyRef}>
       ${activeTab === 'dlc' ? html`<${DlcCompare} chess=${chess} golden=${golden} preview=${dlcPreview} roomDlc=${roomDlc} />` : null}
       ${activeTab === 'voice' ? html`<${OperatorVoice} charId=${chess.charId} />` : null}
-      ${activeTab === 'skin' ? html`<${SkinSection} charId=${chess.charId} />` : null}
       ${activeTab === 'growth' ? html`<${CultivationSection} charId=${chess.charId} ops=${ops} onSet=${onOps} standIn=${notOwned} />` : null}
       ${activeTab === 'skill' ? html`<section class="lo-sec">
         <header class="lo-sec__head">

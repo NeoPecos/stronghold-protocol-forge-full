@@ -22,6 +22,7 @@ import { deepFreeze } from './data.js';
  * @param {{
  *   official: Record<string, any>,    官方数据（无工坊叠加）
  *   processData: Record<string, any>, 进程级那一份（官方 + 所有已加载包）
+ *   processPackIds?: string[],        实际并入进程面的包；省略时等于全部已加载包
  *   packs: Array<any>,                已加载（且已裁剪）的包
  *   kits: Record<string, Function>,   进程级的 kit 映射（干员键）
  *   kitOwners: Map<string, string>,   kit id → 包 id（`loadWorkshopKits` 的 `owners`）
@@ -32,20 +33,32 @@ import { deepFreeze } from './data.js';
  * }} opts
  * @returns {{ forRoom: (modSet: { digest: string, packs: Array<{ id: string }> }|null) => { data: any, kits: any, tokenKits: any, modules: any }, size: () => number }}
  */
-export function createRoomAssets({ official, processData, packs, kits, kitOwners, tokenKits = null, tokenKitOwners = null, modules, log = null }) {
+export function createRoomAssets({ official, processData, processPackIds = null, packs, kits, kitOwners, tokenKits = null, tokenKitOwners = null, modules, log = null }) {
   const list = Array.isArray(packs) ? packs : [];
-  const allIds = new Set(list.map((p) => p.id));
+  const processIds = new Set(Array.isArray(processPackIds) ? processPackIds : list.map((p) => p.id));
+  const scopedKits = (source, owners, ids) => {
+    const selected = {};
+    for (const [id, fn] of Object.entries(source || {})) {
+      const owner = owners && typeof owners.get === 'function' ? owners.get(id) : null;
+      if (owner && ids.has(owner)) selected[id] = fn;
+    }
+    return Object.freeze(selected);
+  };
+  const splitProcess = Array.isArray(processPackIds);
   const processAssets = {
     data: processData,
-    kits,
-    tokenKits,
-    modules: Array.isArray(modules) ? modules : [],
+    kits: splitProcess ? scopedKits(kits, kitOwners, processIds) : kits,
+    tokenKits: splitProcess ? scopedKits(tokenKits, tokenKitOwners, processIds) : tokenKits,
+    modules: splitProcess
+      ? Object.freeze((Array.isArray(modules) ? modules : []).filter((m) => m && processIds.has(m.pack)))
+      : (Array.isArray(modules) ? modules : []),
   };
   /** @type {Map<string, { data: any, kits: any, tokenKits: any, modules: any }>} */
   const cache = new Map();
   /** digest → the materialised set (the HTTP face of a room, `/room-data/<digest>/…`). Only real digests land here. */
   const byDigest = new Map();
-  const sameAsProcess = (ids) => ids.length === allIds.size && ids.every((id) => allIds.has(id));
+  const digestOk = (value) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+  const sameAsProcess = (ids) => ids.length === processIds.size && ids.every((id) => processIds.has(id));
 
   /** 一个包集合是不是**正好**就是进程级那一份（空集合与全集都算）。 */
   function isProcess(ids) { return ids.length === 0 || sameAsProcess(ids); }
@@ -57,7 +70,16 @@ export function createRoomAssets({ official, processData, packs, kits, kitOwners
      */
     forRoom(modSet) {
       const ids = modSet && Array.isArray(modSet.packs) ? modSet.packs.map((p) => p && p.id).filter(Boolean) : [];
-      if (isProcess(ids)) return processAssets;
+      if (isProcess(ids)) {
+        // DLC-managed rooms deliberately set `roomData: true` even while no DLC is enabled: /data remains the
+        // permanent base face and every battle is pinned to the room's digest.  The base set is byte-for-byte the
+        // process assets, so there is nothing to rebuild, but its URL still has to exist.  Previously this early
+        // return skipped `byDigest`, making every /room-data/<base digest>/*.json request 404; the browser then had no
+        // simulation tables and showed 0/-- with no enemies.  Register the already-built process object under a real
+        // room digest.  Null / invented malformed sets still expose nothing.
+        if (digestOk(modSet?.digest)) byDigest.set(modSet.digest, processAssets);
+        return processAssets;
+      }
       const key = modSet.digest || ids.slice().sort().join(',');
       const hit = cache.get(key);
       if (hit) return hit;

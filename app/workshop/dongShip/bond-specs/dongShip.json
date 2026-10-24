@@ -1,0 +1,71 @@
+{
+  "id": "dongShip",
+  "name": "东",
+  "isCore": true,
+  "bondType": "SEASON",
+  "bondOrder": 2,
+  "identifier": 24,
+  "weight": 10,
+  "iconId": "icon_dongShip",
+  "thresholds": [
+    3,
+    6
+  ],
+  "maxCount": null,
+  "thresholdTemplate": "count_threshold_upward",
+  "countMode": "BOARD",
+  "countsHand": false,
+  "countsGoldenOnly": false,
+  "activeType": "BATTLE",
+  "isActiveInDeck": false,
+  "noStack": false,
+  "maxInactiveBondCount": -1,
+  "layerMilestones": [],
+  "desc": "【东】干员造成伤害时，追加一次按目标弱点类型结算的攻击（攻击力×受层数影响的百分比）\n<在场6名不同【东】干员>追加攻击同时积累一定量的神经损伤",
+  "effectId": "bondeffect_dong",
+  "effectName": "东",
+  "effectDesc": "【东】干员造成伤害时，追加一次按目标弱点类型结算的攻击（攻击力×{0:0%}）\n<在场6名不同【东】干员>追加攻击同时积累神经损伤",
+  "effectDescParams": [
+    {
+      "index": 0,
+      "format": "0%",
+      "base": "base_damage_scale",
+      "perStack": "damage_scale_per_stack"
+    }
+  ],
+  "bb": {
+    "base_damage_scale": 0.033,
+    "damage_scale_per_stack": 0.0043955,
+    "power_char_cnt": 3,
+    "power_bond_char_cnt": 6,
+    "neural_damage": 30,
+    "curve_k": 0.0000111111
+  },
+  "bbStr": {
+    "key": "act2autochess_bond_eff_dong"
+  },
+  "baseParams": [
+    "base_damage_scale"
+  ],
+  "perStackParams": [
+    "damage_scale_per_stack"
+  ],
+  "genericBuffs": true,
+  "_meta": {
+    "schema": 1,
+    "source": "Stronghold-Protocol-Forge",
+    "author": "CLa",
+    "pack": "dongShip",
+    "created": "2026-10-12T16:28:48.717Z",
+    "modified": "2026-10-13T18:00:00.000Z",
+    "copyright": {
+      "zh": "本 Option 的著作权归创建它的作者本人所有。创作者可自由分享、分发自己的 Option，并可通过其获得合理回报。",
+      "en": "This Option is the property of the author who created it. Creators may freely share and distribute their own Options and may reasonably profit from them."
+    },
+    "antiResale": {
+      "zh": "禁止未经授权从公开渠道收集他人 Option 并打包、转售或批量分发；转载、整合或二次分发他人 Option 必须保留原作者署名与来源信息。",
+      "en": "No one may, without authorization, collect Options created by others from public sources and package, resell, or bulk-distribute them. Any redistribution must retain the original author's attribution and source information."
+    },
+    "scope": "本声明只针对 Option 创作内容，不改变本项目代码的 GPL-3.0-or-later 授权，也不附加任何限制。"
+  }
+}

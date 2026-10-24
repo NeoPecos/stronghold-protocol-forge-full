@@ -9,9 +9,10 @@
 
 .lo-dhead .mod-host > .mod-panel {
   position: absolute;
-  /* `恢复默认` 是 `position: absolute; top: .12rem`、高约 .48rem ⇒ 它的下沿在 .6rem；这里从 .7rem 起，
-     与它拉开一段距离（否则两个按钮相叠、点击被它截获）。z-index 再抬一层，双保险。 */
-  top: .7rem;
+  /* `恢复默认` 是 `position: absolute; top: .12rem`、高 max(.36rem, 28px) ⇒ 下沿约 .48rem（窄视口最多 .51rem）；
+     这里从 .5rem 起 —— 落在它的下沿与下面 DLC 标注行（`.lo-dlc__badge` 行顶约 .81rem）之间，上下都不压。
+     条自身高 .3rem ⇒ 底边 .8rem。z-index 再抬一层，双保险。 */
+  top: .5rem;
   right: .12rem;
   z-index: 4;
   pointer-events: auto;

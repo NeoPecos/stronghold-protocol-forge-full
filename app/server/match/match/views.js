@@ -13,6 +13,7 @@ import { bountySpawns, previewOf } from '../waves.js';
 import { timelineAt } from '../fields.js';
 import { bossFieldPlacement } from '../finalAssault.js';
 import { battleProgress } from '../../sim/spec.js';
+import { contractPoints } from '../../../shared/contracts.js';
 
 /** Milliseconds since the match started. A stamp before the start, or a bad stamp, is 0. The stored log keeps the epoch. */
 function auditClock(at, startedAt) {
@@ -81,6 +82,10 @@ export class MatchViews {
       serverNow: this.sched.now(),
       modeId: this.modeId,
       difficulty: this.difficulty,
+      ...(this.contracts?.length ? {
+        contracts: this.contracts.slice(),
+        contractPoints: contractPoints(this.contracts, this.difficulty),
+      } : {}),
       stageId: this.stageId,
       setupRevision: this.setupRevision,
       rerollVote: this.setupVote ? {
@@ -101,7 +106,7 @@ export class MatchViews {
       hiddenBossId: this.hiddenBossId,
       // 开发者面板强制的首领回合：这一整个回合都要看起来像官方首领回合（客户端的 最终攻势 分场 / 相机 / 首领 HUD
       // 全部按 `pub.bossRound` 判定）—— 覆盖它，否则服务端计划了首领波次、界面照样是普通场景。
-      bossRound: this.devBossRound ?? this.gd.bossRound,
+      bossRound: this.devBossRound ?? (this.gd.isBossRound(this.round) ? this.round : this.gd.bossRound),
       hiddenRound: this.gd.hiddenRound,
       bossPairs: this.bossWaves ? this.bossWaves.map(w => w.players.slice()) : this.bossPairs ? this.bossPairs.map(ids => ids.slice()) : null,
       spRound: this.gd.spRounds().includes(this.round),
@@ -109,6 +114,8 @@ export class MatchViews {
       combatMode: this.clientCombat ? 'client' : 'server',
       // solo pause (g.pause, DESIGN §14): the battle, its field clock and every deadline are frozen while true
       paused: !!this.paused,
+      combatSpeed: this.gameSpeed,
+      speedVote: this.speedVote ? { target: this.speedVote.target, voters: this.speedVote.voters.slice(), agreed: this.speedVote.agreed.slice() } : null,
       // 开发者模式（「全量模拟」）：客户端据此显示局内开发者面板。普通对局**不出现这个键**（帧逐字节不变）。
       ...(this.dev ? { dev: true } : {}),
       // 已武装、还没被下一回合消费的战斗类型（面板据此高亮 / 提示「下一回合生效」）。
