@@ -897,6 +897,7 @@ export class UnitView {
    */
   retryAssets() {
     if (this.destroyed) return;
+    this._loadTierChip();
     const url = this._pictureUrl();
     if (!this._pic || this._pic.state === 'none') this._loadPicture();
     else if (url && url !== this._pic.url) this._loadPicture(true);
@@ -1093,6 +1094,7 @@ export class UnitView {
       this.chip = new P.Sprite(tierChip(this.tier, this.golden));
       this.chip.anchor.set(0.5);
       h.addChild(this.chip);
+      this._loadTierChip();
     }
     this.icons = [];
     for (let i = 0; i < 4; i++) {
@@ -1120,6 +1122,32 @@ export class UnitView {
     this.equipItems = [];
     this.equipCount = 0;
     this._equipLayoutKey = '';
+  }
+
+  // Bound both dimensions to the projected tile; small mobile boards must not inherit a desktop minimum.
+  _sizeTierChip(s) {
+    this._chipTileSize = s;
+    const w = this.chip.texture.width || 64;
+    const h = this.chip.texture.height || 44;
+    const cs = Math.min(Math.min(s * 0.65, 40) / w, Math.min(s * 0.45, 28) / h);
+    this.chip.scale.set(cs);
+  }
+
+  _loadTierChip() {
+    const assets = this.ctx.assets;
+    if (!this.chip || !assets?.image) return;
+    const local = assets.localUrl?.('ui/battle', `autochess_level_${this.tier}`);
+    const fallback = assets.ui?.(`shopCard/img_chess_level_${this.tier}`);
+    const url = local || fallback;
+    if (!url || this._chipUrl === url) return;
+    this._chipUrl = url;
+    assets.image(url).then((image) => {
+      if (this.destroyed || this._chipUrl !== url) return;
+      if (image) { this.chip.texture = this.P.Texture.from(image); this._sizeTierChip(this._chipTileSize || 0); }
+      else if (local && fallback) assets.image(fallback).then((fallbackImage) => {
+        if (!this.destroyed && this._chipUrl === url && fallbackImage) { this.chip.texture = this.P.Texture.from(fallbackImage); this._sizeTierChip(this._chipTileSize || 0); }
+      });
+    });
   }
 
   /** Show a stack count (token stacks in the hand) — BitmapText-free: a tiny canvas-less chip via Text. */
@@ -1873,26 +1901,24 @@ export class UnitView {
       this.spGlow.scale.set((spH * 5) / 128);
       this.spGlow.alpha = pulse;
     }
-    // tier chip (left of the bars in battle; above the head in prep)
     if (this.chip) {
-      const cs = clamp(s * (prep ? 0.24 : 0.19), 11, 28) / 44;
-      this.chip.scale.set(cs);
-      this.chip.visible = this.alive;
-      if (prep) this.chip.position.set(x, y - this.chip.height / 2 + 2);
-      else this.chip.position.set(x0 - this.chip.width / 2 - 1, cy + (showSp ? spH / 2 : 0));
+      this._sizeTierChip(s);
+      this.chip.visible = prep && this.alive;
+      if (this.chip.visible) this.chip.position.set(x - bw / 2 - this.chip.width / 2, y - 4);
     }
-    // Main-server equipment UI: a slim segmented rail under the operator's tier chip during preparation. DLC slot
+    // Main-server equipment UI: a slim segmented rail beside the operator's tier chip during preparation. DLC slot
     // expansion keeps that rail and splits it into more segments instead of placing large item pictures on the unit.
     const showEquip = prep && this.alive && !!this.chip && this.equipCount > 0;
     this.equipTrack.visible = showEquip;
     if (showEquip) {
       const trackX = x - bw / 2 + 1;
       const count = Math.min(MAX_ITEM_PIPS, this.equipCount);
-      const gap = count === 2 ? 2 : 1;
+      const capacity = Math.max(2, count);
+      const gap = 2;
       const inset = 3;
-      const slotW = Math.max(1, (bw - inset * 2 - gap * (count - 1)) / count);
+      const slotW = Math.max(1, (bw - inset * 2 - gap * (capacity - 1)) / capacity);
       this.equipTrack.position.set(trackX, y - 4);
-      const layoutKey = `${Math.round(bw * 100)}/${count}`;
+      const layoutKey = `${Math.round(bw * 100)}/${capacity}`;
       if (this._equipLayoutKey !== layoutKey) {
         this._equipLayoutKey = layoutKey;
         this.equipTrack.clear().lineStyle(1, 0xd3d9d7, 0.9).beginFill(0x111514, 0.96).drawRoundedRect(0, -4, bw, 8, 4).endFill();

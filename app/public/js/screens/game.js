@@ -824,10 +824,7 @@ function MatchScreen() {
     // (ui/matchPopups.js); the other phases keep the banner. The screen and the plates replace a banner still on screen
     // from a phase shorter than it (everyone ready at once; the dev mock opening at PREP)
     const plate = phasePopupOf(phase, b);
-    if (phase === PHASE.BATTLE_CHECK && bootArtReady()) { setBanner(null); setBoot({ key: phaseKey }); }
-    else if (phase === PHASE.FINAL_ASSAULT && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'final', ...finalPlateRows(pub), key: phaseKey }); }
-    else if (phase === PHASE.HIDDEN_CORE && bossPlateArtReady()) { setBanner(null); setBossPlate({ kind: 'core', key: phaseKey }); }
-    else if (phase === PHASE.ROUND_START && b && pub?.round > 0) {
+    if (phase === PHASE.ROUND_START && b && pub?.round > 0) {
       setBanner(null);
       setRoundPop({ round: pub.round, left: roundsToBoss(pub), sub: b.sub, watching: spectator || !alive, key: phaseKey });
     } else if (plate) setBanner({ ...plate, plate: true, key: phaseKey });
@@ -1614,6 +1611,20 @@ function MatchScreen() {
     stripOwnerRef.current = strip.ownerId;
     setBondOpen((b) => (b && b.from === 'strip' ? null : b));
   }, [strip.ownerId]);
+
+  // 点空白关闭盟约弹窗（维护者 2026-10-25）：落点在弹窗与顶部盟约圆盘之外的任何地方都收起。圆盘自己带
+  // toggleBond（再点一次同一个圆盘也是关），所以这里把 `.bstrip` 排除在外，免得两个动作打架。
+  useEffect(() => {
+    if (!bondOpen) return undefined;
+    const onDown = (e) => {
+      const t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      if (t.closest('.bpop, .bstrip')) return;
+      setBondOpen(null);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, [bondOpen]);
   // the popup shows the player it was opened for (ui/watchBonds.js popupView): their entry + live layers, their name,
   // and as members your pieces or their operators on the field on screen — under client-side combat the battle's own
   // (the runner's field meta is taken before they deploy); a battle sends no bench (a prep scout does: ownerBoard)

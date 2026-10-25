@@ -10,11 +10,9 @@ import { readFileSync } from 'node:fs';
 import { chessPortraitUrl, chessAvatarUrl } from '../../public/js/ui/assetUrls.js';
 import { DEFAULT_SETTINGS } from '../../public/js/ui/gameLogic/settings.js';
 import {
-  portraitEntry, portraitUrlOf, avatarUrlOf, appearanceSpineFor,
+  portraitEntry, portraitUrlOf, avatarUrlOf,
   setAppearanceLookup, currentAppearanceLookup, clearAppearanceLookup,
   setAppearanceFirst, appearanceFirstEnabled,
-  setOwnAppearance, setPeerAppearance, clearPeerAppearance,
-  setPeerAvatar, peerAvatarOf, clearPeerAvatars, setMyPlayerId,
 } from '../../public/js/ui/portraitChain.js';
 
 /**
@@ -84,16 +82,16 @@ describe('解析链：没有 hook 时与今天**逐字相同**（开关开与关
     }
   });
 
-  test('头像：与 chessAvatarUrl 逐例一致 —— 上游 0.3.1 起头像**也**看 isGolden', () => {
+  test('头像：与 chessAvatarUrl 一致 —— **包括不看 isGolden 这一条**', () => {
     for (const c of CASES) {
       const got = avatarUrlOf(M, c.chess);
       const want = chessAvatarUrl(M, c.chess);
       assert.equal(got, want, `${c.name}: 头像链 = ${JSON.stringify(got)}，今天 = ${JSON.stringify(want)}`);
     }
-    // 上游 0.3.1 改了这条语义（`chessAvatarUrl` 的 avatarE2 分支）：精锐棋子在该角色条目有 E2 头像时
-    // 用 `avatarE2`，头像与立绘在这一点上**一致**了。0.3.0 的旧约定（精锐变体由调用方自己传）已被上游取消。
-    assert.equal(avatarUrlOf(M, { charId: 'char_a', isGolden: true }), 'a/v2.png', '精锐头像走 avatarE2');
-    assert.equal(portraitEntry(M, { charId: 'char_a', isGolden: true }, { kind: 'portrait' }), 'a/p2.png', '立绘同样走 E2');
+    // 单独钉住那条容易写错的语义：头像**不**因 isGolden 改用 E2 —— 精锐变体由调用方自己传
+    // （`screens/diy.js`：`elite ? unit.assets.avatarGolden : unit.assets.avatar`）。
+    assert.equal(avatarUrlOf(M, { charId: 'char_a', isGolden: true }), 'a/v1.png', '普通头像');
+    assert.equal(portraitEntry(M, { charId: 'char_a', isGolden: true }, { kind: 'portrait' }), 'a/p2.png', '而立绘会走 E2');
   });
 
   test('开关**关掉**时：逐项与今天相同（这是那条最硬的验收点）', () => {
@@ -132,9 +130,7 @@ describe('解析链：没有 hook 时与今天**逐字相同**（开关开与关
     const id = portraitEntry(M, { charId: 'char_a', assets: { portrait: 'char_c' } });
     assert.equal(id, 'c/p1.png', '精确命中优先于回落');
     // 也就是说：这一条**有意**与旧的 chessPortraitUrl 不同 —— 差异集中在「id 是 chars 里的精确键」这一种输入上。
-    // 上游 0.3.1 起 `chessPortraitUrl` 自己也认「id 是 chars 里的精确键」了（它多了 E2 那一条分支），
-    // 所以这一条现在与链一致 —— 0.3.0 时旧实现确实忽略它，那条差异已经被上游抹平。
-    assert.equal(chessPortraitUrl(M, { charId: 'char_a', assets: { portrait: 'char_c' } }), 'c/p1.png', '旧实现现在也认精确键');
+    assert.equal(chessPortraitUrl(M, { charId: 'char_a', assets: { portrait: 'char_c' } }), 'a/p1.png', '旧实现确实忽略它');
     // 开了工坊外观也一样：**没有提供者**时这一步整段不存在（这是「默认开」仍然安全的原因）
     assert.equal(portraitEntry(M, { charId: 'char_a', assets: { portrait: 'char_c' } }, { skins: true }), 'c/p1.png');
   });
@@ -190,10 +186,9 @@ describe('提供者先说话（步骤 0）：开关打开且确有提供者', ()
       assert.equal(chessPortraitUrl(M, { charId: 'char_a', assets: { portrait: 'char_a_2' } }), 'a/p2.png', '与旧实现逐字相同');
       assert.equal(portraitEntry(M, { charId: 'char_a', assets: { portrait: 'char_a_1' } }), 'a/p1.png', '点名一阶 ⇒ 官方一阶');
       assert.equal(asked, 0, '点名了版本就不该打扰提供者');
-      // 夹具里的 `char_c_2` 是一条**真实存在的记录**（官方精锐就是这样）：上游 0.3.1 起
-      // `chessPortraitUrl` 也认精确键，所以两边都直接用它自己的 `portrait`，不再走「去掉 _2」那条分支。
-      assert.equal(portraitEntry(M, { charId: 'char_a', assets: { portrait: 'char_c_2' } }), 'c2/p1.png');
-      assert.equal(chessPortraitUrl(M, { charId: 'char_a', assets: { portrait: 'char_c_2' } }), 'c2/p1.png', '与旧实现逐字相同');
+      // 提供者不认识的那一种输入，后缀分支照旧（去 `_2` 之后命中的是 `char_c`；它没有 `portraitE2`）
+      assert.equal(portraitEntry(M, { charId: 'char_a', assets: { portrait: 'char_c_2' } }), 'c/p1.png');
+      assert.equal(chessPortraitUrl(M, { charId: 'char_a', assets: { portrait: 'char_c_2' } }), 'c/p1.png', '与旧实现逐字相同');
     });
   });
 
@@ -389,51 +384,6 @@ describe('简写与清单缺失', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// 时装那一半的**模型**（`appearanceSpineFor`）：对局里的单位只带 `ownerId`，所以「他穿的是哪一套」必须按**归属**
-// 从同一份选择里取 —— 别人（以及观战的人）看到的那具模型就是这一条。
-//
-// 为什么单独一组：立绘那半有 15 条行为用例，模型这半此前**一条行为断言都没有**（只有一处源码守卫钉着接线）。
-// 而「观战看不到别人的时装」与「自己本机换了」在界面上是两件事 —— 一条坏在这里的链，症状正好是前者。
-// ---------------------------------------------------------------------------------------------------
-describe('时装那一半：模型按 owner 取（别人穿了什么就画什么）', () => {
-  /** 一套时装的模型条目（`isSpineEntry` 的形状：绝对 `/…` 路径 + `anims`）。 */
-  const spine = (stem) => ({ skel: `/workshop-assets/alpha/skin/${stem}.skel`, atlas: `/workshop-assets/alpha/skin/${stem}.atlas`,
-    textures: [`/workshop-assets/alpha/skin/${stem}.png`], anims: { idle: 'Idle', attack: { loop: 'Attack' } } });
-  const S = {
-    ...M,
-    skins: {
-      char_a: [{ pack: 'alpha', id: 'skim', name: '泳装', art: {
-        portrait: '/workshop-assets/alpha/skin/p.png', avatar: '/workshop-assets/alpha/skin/a.png',
-        spine: { front: spine('char_a_skim_1'), back: spine('char_a_skim_1b') } } }],
-    },
-  };
-
-  test('自己 / 别人 / 归属未知：三种 owner 各答各的，front 与 back 各取各的', () => {
-    setMyPlayerId('me');
-    setOwnAppearance({ char_a: { skinId: 'skim' } });
-    setPeerAppearance('p_b', { char_a: { skinId: 'skim' } });
-    try {
-      assert.equal(appearanceSpineFor(undefined, 'char_a', false, S).skel, '/workshop-assets/alpha/skin/char_a_skim_1.skel', '我自己那一枚');
-      assert.equal(appearanceSpineFor('me', 'char_a', false, S).skel, '/workshop-assets/alpha/skin/char_a_skim_1.skel',
-        '我的 playerId 与「我自己」等价（`setMyPlayerId` 那张对照表）');
-      assert.equal(appearanceSpineFor('p_b', 'char_a', false, S).skel, '/workshop-assets/alpha/skin/char_a_skim_1.skel',
-        '**别人**那一枚：观战里看到的就是这一条');
-      assert.equal(appearanceSpineFor('p_b', 'char_a', true, S).skel, '/workshop-assets/alpha/skin/char_a_skim_1b.skel', 'back 那一份');
-      assert.equal(appearanceSpineFor(null, 'char_a', false, S), null, '归属未知（敌人）：**不套用任何人的时装**');
-      assert.equal(appearanceSpineFor('p_c', 'char_a', false, S), null, '没选过的座位：回落原版模型');
-      assert.equal(appearanceSpineFor('p_b', 'char_b', false, S), null, '没选过的干员：同上');
-      assert.equal(appearanceSpineFor('p_b', 'char_a', false, M), null, '清单里没有这一套时装：同上');
-      // 立绘与模型取的是**同一份选择**（同一条链）：这一条是「本机换了、战场上还是原版」那种半失效的判据
-      assert.equal(portraitUrlOf(S, { charId: 'char_a' }, { owner: 'p_b', kind: 'portrait' }), '/workshop-assets/alpha/skin/p.png');
-    } finally {
-      setOwnAppearance(null);
-      clearPeerAppearance();
-      setMyPlayerId(null);
-    }
-  });
-});
-
-// ---------------------------------------------------------------------------------------------------
 // 消费点：立绘与头像**走同一条链**（皮肤层设计稿的开放问题 2 —— 时装也影响小头像这一类）。
 //
 // 这条测的不是链本身，而是「**没有哪个消费点漏掉**」：漏掉的那个会继续读旧函数，
@@ -528,58 +478,5 @@ describe('设置 →「工坊外观」：门控与设置的接线（源码级守
     const imports = chain.split('\n').filter((l) => /^\s*import\b/.test(l));
     assert.deepEqual(imports, [], `portraitChain.js 今天一个 import 都没有；加了 import 就要重新审这条边界：${imports.join(' | ')}`);
     assert.equal(/settingsStore|sanitizeSettings|localStorage/.test(chain), false, '链自己不认识设置');
-  });
-});
-
-// ---------------------------------------------------------------------------------------------------
-// 别人那一张**玩家头像**（`room.appearance` 的顶层 `avatar`）：链上按座位记、两个读点照它画。
-//
-// 为什么与 `peerAppearance`（按干员的换装）分开存：那一张是**人的**头像、不按干员分组（协议里也是两个字段）。
-// 为什么要有这一组：不广播 / 不进座位 / 没有读点，任何一处漏了，结果都是同一句「别人看不到我的头像」
-// （业主 2026-10-20 报的那一条），而三处里坏哪一处，界面上的现象长得一模一样。
-// ---------------------------------------------------------------------------------------------------
-describe('别人那一张头像（appearance.avatar）：链上按座位记、两个读点照它画', () => {
-  test('记 / 读 / 清：自己那一席一律 null（我自己那一枚由宿主读 `me.avatar`）', () => {
-    clearPeerAvatars();
-    setMyPlayerId(null);
-    const AV = 'data:image/png;base64,iVBORw0KGgo=';
-    setPeerAvatar('p_a', AV);
-    setPeerAvatar('p_b', '/workshop-assets/alpha/avatar.png');
-    assert.equal(peerAvatarOf('p_a'), AV);
-    assert.equal(peerAvatarOf('p_b'), '/workshop-assets/alpha/avatar.png');
-    assert.equal(peerAvatarOf('p_none'), null, '不认识的座位 ⇒ null（读点退回首字）');
-    assert.equal(peerAvatarOf(null), null);
-    // 我自己那一席：`setMyPlayerId` 之后一律 null —— 那两个读点因此不必各自再判一次「这是不是我」
-    setMyPlayerId('p_a');
-    assert.equal(peerAvatarOf('p_a'), null, '我自己那一枚不在这一张表里');
-    assert.equal(peerAvatarOf('p_b'), '/workshop-assets/alpha/avatar.png', '别人的照旧');
-    setMyPlayerId(null);
-    // 清除（null / '' / 坏值都是「这一位没有」）
-    setPeerAvatar('p_a', null);
-    setPeerAvatar('p_b', 42);
-    assert.equal(peerAvatarOf('p_a'), null);
-    assert.equal(peerAvatarOf('p_b'), null);
-    setPeerAvatar('p_a', AV);
-    clearPeerAvatars();
-    assert.equal(peerAvatarOf('p_a'), null, '换房 / 离开房间就全清（我自己那一枚动不到 —— 它在 store 里）');
-  });
-
-  test('接线（源码级）：`main.js` 从房态里读它并按座位记，三个消费点各接一处', () => {
-    const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
-    const main = read('public/js/main.js');
-    assert.match(main, /s\.appearance\.avatar\.avatar/, '`syncRoomAppearance` 要从座位的 `appearance.avatar` 里取值');
-    assert.match(main, /setPeerAvatar\(s\.playerId, avatar\)/, '别人的交给链上的 `setPeerAvatar`');
-    assert.ok(/clearPeerAvatars\(\)/.test(main), '离开房间 / 关房要清掉（与 clearPeerAppearance 同一条）');
-    // 我自己那一枚：本机空 ⇒ 采纳房态那份；本机有而房态不同 ⇒ **补发一次**（`setAvatar` 可能发在引擎还没连上的时候）
-    assert.match(main, /if \(!mineAvatar && avatar\)/, '本机没记过而房间有 ⇒ 采纳（与 picks 的 adopt 同一条）');
-    assert.match(main, /else if \(mineAvatar && mineAvatar !== avatar\) net\.send\('room\.appearance', \{ avatar: \{ avatar: mineAvatar \} \}\)/,
-      '本机有而房间那份不同 ⇒ 补发（与 picks 的 push 同一条）');
-    // 广播那一边：`ctx.session.setAvatar` 自己发 `room.appearance` 的顶层 avatar（不广播就只有我自己看得见）
-    const ext = read('public/js/ui/extensions.js');
-    assert.ok(/net\.send\('room\.appearance', payload\)/.test(ext), 'setAvatar 必须把这一条发上线');
-    assert.match(ext, /const payload = \{ avatar: \{ avatar: src \} \}/, '发出去的形状就是协议那一格');
-    // 两个读点：房间座位卡（别人那一席）与局内队友那一行
-    assert.ok(/peerAvatarOf/.test(read('public/js/screens/room.js')), '房间座位卡要照它画别人的那一枚');
-    assert.ok(/peerAvatarOf/.test(read('public/js/ui/gameComponents.js')), 'PlayerAvatar 要照它画别人的那一枚');
   });
 });

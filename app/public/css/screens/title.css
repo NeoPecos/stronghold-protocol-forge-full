@@ -422,3 +422,9 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .title-account-switch:hover { color: #7fe9c3; }
 .title-account-switch:disabled { opacity: .5; cursor: default; }
 .title-account-error { font-size: .13rem; color: #ff8d7a; }
+
+/* 记住账号密码（2026-10-25，title.js）：账号行里 switch 之后的勾选，取消即清掉本机保存的密码。 */
+.title-remember{display:inline-flex;align-items:center;gap:.06rem;font:inherit;font-size:.22rem;color:#b9c8cf;cursor:pointer;user-select:none;white-space:nowrap}
+.title-remember input{width:.18rem;height:.18rem;margin:0;accent-color:#4ed8af;cursor:pointer;flex:none}
+.title-remember:hover{color:#7fe9c3}
+.title-remember input:disabled{cursor:default}

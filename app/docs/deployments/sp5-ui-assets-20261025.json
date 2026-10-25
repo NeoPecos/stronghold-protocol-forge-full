@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "ui-custom/deploy-cost.svg",
+      "url": "https://sp5.bs.leio.fun/ui-custom/deploy-cost.svg",
+      "bytes": 431,
+      "sha256": "7b3bbd03257eab1389aa4605187120906ea27e32db0937342ed3d3bec2dc3e86"
+    },
+    {
+      "path": "ui-custom/shopkeeper.png",
+      "url": "https://sp5.bs.leio.fun/ui-custom/shopkeeper.png",
+      "bytes": 1165223,
+      "sha256": "005daeb5167e809ac202e4538548896c60fe7a144ba9863d9dd109983fd340c7"
+    },
+    {
+      "path": "ui-custom/topbar/bg_rest_fork_030.png",
+      "url": "https://sp5.bs.leio.fun/ui-custom/topbar/bg_rest_fork_030.png",
+      "bytes": 900142,
+      "sha256": "4b0eda5ebf8301e45c1ed9489b32ea59056817f16534e4c5689e8640449464ba"
+    },
+    {
+      "path": "ui-custom/topbar/frame_mid_fork_030.png",
+      "url": "https://sp5.bs.leio.fun/ui-custom/topbar/frame_mid_fork_030.png",
+      "bytes": 482174,
+      "sha256": "4fa2e8dcd1a5f3b8f8eab748524a9ff41823edbc4ddd11aaeb35d64e7eb05704"
+    }
+  ]
+}

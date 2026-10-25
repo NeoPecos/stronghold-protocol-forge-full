@@ -47,7 +47,7 @@ import { openFriends } from '../ui/friends.js';
 import { NameCardLayer } from '../ui/namecards.js';
 import { SettingsButton } from '../ui/settings.js';
 import { LoadoutButton } from './loadout.js';
-import { PluginTag, isModdedRoom } from '../ui/pluginTag.js';
+import { isModdedRoom } from '../ui/pluginTag.js';
 import { hasScriptConsent, rememberScriptConsent } from '../content.js';
 import { SupportButton } from './support.js';
 import { modComponent } from '../ui/modComponents.js';
@@ -65,9 +65,8 @@ import { chessAvatarUrl } from '../ui/assetUrls.js';
 import { CARD_PREF, cardOperators, seatPortrait } from '../ui/seatArt.js';
 // 别人那一席的**玩家头像**（`appearance.avatar` 那一路，见 `ui/portraitChain.js`）：座位卡是它的两个读点之一。
 import { peerAvatarOf } from '../ui/portraitChain.js';
-import { remembersCapacity, setCapacityRemember } from '../ui/roomPrefs.js';
 import { C2S } from '../../../shared/protocol.js';
-import { difficultyInfo, ProtoCard, LAYER_TEXT, serverSeatMaxOf } from './lobby.js';
+import { difficultyInfo, ProtoCard, LAYER_TEXT, serverSeatMaxOf, requestAllianceSheet } from './lobby.js';
 import { ProtocolScene } from '../ui/protocolScene.js';
 import { SearchPanel, FoundPanel } from '../ui/matchFlow.js';
 import { usePresence, useRise, afterLeave } from '../ui/transitions.js';
@@ -75,6 +74,8 @@ import { t, tc } from '../../../shared/i18n.js';
 
 /** 房主上一次启用的合约词条：本地记忆，换房间/换对局后自动套回（服务端只认房主、要求解算结果一致）。 */
 const CONTRACTS_PREF = 'contracts.last';
+/** 房主上次启用的 DLC 组合（dlc.js 写入）；新房间自动套回，见下方 restoredDlc effect。 */
+const DLC_PREF = 'dlc.last';
 
 const MAX_SEATS = Number(SEAT_CONST.MAX_SEATS) || 4;
 const DEFAULT_SEATS = Number(SEAT_CONST.DEFAULT_SEATS) || MAX_SEATS;
@@ -261,16 +262,11 @@ export function seatCapRoomRange(room, serverMax) {
 function SeatCapSetter({ room, isHost, onPick }) {
   const range = isHost ? seatCapRoomRange(room, serverSeatMaxOf()) : null;
   const [asked, setAsked] = useState(null);
-  const [remember, setRemember] = useState(remembersCapacity);
   useEffect(() => {
     if (asked != null && room && room.seatCap === asked) setAsked(null);
   }, [asked, room]);
-  useEffect(() => {
-    if (isHost && remember && room) setCapacityRemember(true, room.maxSeats || room.seatCap || DEFAULT_SEATS);
-  }, [isHost, remember, room?.maxSeats, room?.seatCap]);
   if (!range) return null;
   const shown = asked != null && asked >= range.min && asked <= range.max ? asked : range.value;
-  const choices = null;
   const pct = Math.round(((shown - range.min) / (range.max - range.min)) * 100);
   const commit = async (v) => {
     const want = Math.min(Math.max(v, range.min), range.max);
@@ -281,16 +277,12 @@ function SeatCapSetter({ room, isHost, onPick }) {
   return html`<div class="seat-cap seat-cap--room">
     <${MicroLabel} tone="mint">SEATS<//>
     <span class="seat-cap__name">${t('本房间人数上限')}</span>
-    ${choices ? html`<div class="seat-cap__choices" role="radiogroup" aria-label=${t('本房间人数上限')}>
-      ${choices.map((n) => html`<button type="button" class=${`seat-cap__choice${n === shown ? ' is-on' : ''}`}
-        role="radio" aria-checked=${n === shown} disabled=${!!asked} onClick=${() => commit(n)}>${n}</button>`)}</div>
-      <label class="seat-cap__remember"><input type="checkbox" checked=${remember}
-        onChange=${(e) => { const on = e.currentTarget.checked; setRemember(on); setCapacityRemember(on, shown); }} />${t('记住本次选择')}</label>` : html`<input class="seat-cap__slider" type="range" min=${range.min} max=${range.max} step="1" value=${shown}
+    <input class="seat-cap__slider" type="range" min=${range.min} max=${range.max} step="1" value=${shown}
       style=${`--pct:${pct}%`} aria-label=${t('本房间人数上限')}
       aria-valuemin=${range.min} aria-valuemax=${range.max} aria-valuenow=${shown}
       title=${t('不能小于同盟内现有人数（含 AI 队友）')}
       onInput=${(e) => setAsked(Number(e.currentTarget.value))}
-      onChange=${(e) => commit(Number(e.currentTarget.value))} />`}
+      onChange=${(e) => commit(Number(e.currentTarget.value))} />
     <span class="seat-cap__value num">${shown}<span class="t-dim"> / ${range.max}</span></span>
   </div>`;
 }
@@ -892,6 +884,36 @@ export function RoomScreen() {
       .catch((err) => { if (alive.current) toastError(err); });
   }, [room?.code, room?.contracts?.length, room?.mode, room?.inMatch, room?.difficulty, room?.seatCap, room?.maxSeats, facts?.isHost]);
 
+  // DLC 记忆: 房主上一次启用的 DLC 组合存在本地, 新建房间进来就自动套回去.
+  // 否则「上一局开着 DLC、下一局默认全关」会让玩家为 DLC 干员调好的技能/时装在本局内容面里失效
+  // （服务端会把这些条目逐条丢掉并提示，但玩家体感仍然是「设置丢了」）。
+  const restoredDlc = useRef(null);
+  useEffect(() => {
+    if (!room || !facts || !facts.isHost) return;
+    if (room.inMatch) return;
+    if (!room.dlc) return;
+    if (room.dlc.enabled && room.dlc.enabled.length) return;
+    if (restoredDlc.current === room.code) return;
+    const saved = loadPref(DLC_PREF, null);
+    const savedIds = saved && Array.isArray(saved.ids) ? saved.ids.filter((id) => typeof id === 'string') : [];
+    if (!savedIds.length) return;
+    const available = new Set(room.dlc.available || []);
+    const want = savedIds.filter((id) => available.has(id));
+    if (!want.length) return;
+    restoredDlc.current = room.code;
+    (async () => {
+      for (const id of want) {
+        try {
+          await net.request('room.setDlc', { id, on: true });
+        } catch (err) {
+          if (alive.current) toastError(err);
+          return;
+        }
+      }
+      if (alive.current) toast(t('已套用上次启用的 DLC（{n} 项）', { n: want.length }), 'success');
+    })();
+  }, [room?.code, room?.dlc?.enabled?.length, room?.inMatch, facts?.isHost]);
+
   const toggleReady = () => run('ready', () => net.request('room.ready', { ready: !myReady }));
   // 重构模拟（mode 'recon'）的自由选队：换队不重置就绪（服务端同一口径），满员 / 对局锁由服务端点名拒绝。
   const pickTeam = (team) => run('team', () => net.request('room.setTeam', { team }));
@@ -933,7 +955,14 @@ export function RoomScreen() {
   const addBot = (seat) => run(`add${seat}`, () => net.request('room.addBot', { seat }));
   const takeSeat = (seat) => run('seat', () => net.request('room.takeSeat', { seat }));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
-  const setDifficulty = (difficulty) => run('diff', async () => { await net.request('room.setDifficulty', { difficulty }); setPicker(false); });
+  // 房间内改难度也要记成这台设备的偏好（与大厅 start sheet 共用同一组 key：
+  // lobby.difficulty / lobby.firepowerDifficulty；键名必须与 lobby.js 的 pickDifficulty 一致）。
+  // 否则在大厅之外改了档位，下一次创房又会退回默认的「标准模拟」。
+  const setDifficulty = (difficulty) => run('diff', async () => {
+    await net.request('room.setDifficulty', { difficulty });
+    savePref(room?.random === true ? 'lobby.firepowerDifficulty' : 'lobby.difficulty', difficulty);
+    setPicker(false);
+  });
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
   // spectator seats: the host frees one; a spectator takes a free player seat with room.join of this room.
   const removeSpectator = (playerId) => run(`rs${playerId}`, () => net.request('room.removeSpectator', { playerId }));
@@ -974,6 +1003,7 @@ export function RoomScreen() {
       if (err?.code !== 'NOT_IN_ROOM') toastError(err);
     } finally {
       // Leaving locally is always safe: the server either confirmed or no longer has us in the room.
+      requestAllianceSheet();   // 退出房间 → 回到「选择同盟方式」页，而不是大厅首页
       store.set({ room: null, match: emptyMatch() });
       inFlight.current = false;
       if (alive.current) setBusy(null);
@@ -1022,7 +1052,6 @@ export function RoomScreen() {
           <${LobbyMusicButton} />
           <${RoomModManager} mods=${managerMods} declared=${managerDeclared} />
         </div>
-        <${PluginTag} room=${room} myId=${me.playerId} />
       </div>
       <div class="rs-top__right">
         <${LoadoutButton} from="room" size="md" class="hub-plate hub-plate--loadout rs-loadout" label=${t('干员调配')} />

@@ -109,6 +109,21 @@ export function rowLpTip(lp, cap = 10) {
     : t('目标生命值 {lp}，结算时扣除 {pending} 点', { lp: lp.lp, pending: lp.pending });
 }
 
+/** Match the room's four-seat groups when this Forge server does not publish poolGroups. */
+export function rosterGroups(pub, players = sortedPlayers(pub)) {
+  if (Array.isArray(pub?.poolGroups) && pub.poolGroups.length) {
+    return pub.poolGroups.map((members, index) => ({ members, label: pub.poolGroupLabels?.[index] ?? index + 1 }));
+  }
+  const groups = new Map();
+  for (const player of players) {
+    const seat = Number.isInteger(player.seat) && player.seat >= 0 ? player.seat : 0;
+    const index = Math.floor(seat / 4);
+    if (!groups.has(index)) groups.set(index, []);
+    groups.get(index).push(player.playerId);
+  }
+  return [...groups].sort(([a], [b]) => a - b).map(([index, members]) => ({ members, label: index + 1 }));
+}
+
 /**
  * @param {{ pub:any, myId:string, watching:string|null, bubbles: Map<string,{id:string,seq:number}>, onWatch:(p:any)=>void,
  *   compact?: boolean, teamLp?: number|null, self?: { lp?: number|null, pending: number, unite: boolean, left?: number|null } | null,
@@ -125,7 +140,8 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
   useEffect(() => { setOpenPid(null); }, [phaseKey, watching, observe?.observing]);
   const players = sortedPlayers(pub);
   if (!players.length) return null;
-  const groups = Array.isArray(pub?.poolGroups) && pub.poolGroups.length ? pub.poolGroups : [players.map((player) => player.playerId)];
+  const roster = rosterGroups(pub, players);
+  const groups = roster.map((group) => group.members);
   const byId = new Map(players.map((player) => [player.playerId, player]));
   const groupByPlayer = new Map(groups.flatMap((members, index) => members.map((id) => [id, index])));
   const orderedPlayers = groups.flatMap((members) => members.map((id) => byId.get(id)).filter(Boolean));
@@ -161,8 +177,8 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
     noteAsked(p);
     onWatch(p);
   };
-  return html`<aside class=${cx('team', compact && 'team--compact')} aria-label=${t('同盟成员')}>
-    ${players.length > 4 ? html`<button type="button" class="team__toggle" onClick=${() => setCollapsed((value) => !value)}>${collapsed ? `${t('同盟成员')} (${players.length})` : t('收起')}</button>` : null}
+  return html`<aside class=${cx('team', compact && 'team--compact', players.length > 4 && 'team--scrollable')} aria-label=${t('同盟成员')}>
+    ${players.length > 4 ? html`<button type="button" class="team__toggle" aria-expanded=${String(!collapsed)} onClick=${() => setCollapsed((value) => !value)}>${collapsed ? `${t('同盟成员')} (${players.length})` : t('收起')}</button>` : null}
     ${collapsed ? null : html`<div class="team__list">
     ${orderedPlayers.map((p, index) => {
       const self = p.playerId === myId;
@@ -177,7 +193,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
       const lp = rowLp(p, pub, self ? selfLive : null, { uniteLocal, cap });
       const inTeam = team.has(p.playerId);
       const groupIndex = groupByPlayer.get(p.playerId) ?? 0;
-      const labelIndex = (pub?.poolGroupLabels?.[groupIndex] ?? groupIndex + 1) - 1;
+      const labelIndex = (roster[groupIndex]?.label ?? groupIndex + 1) - 1;
       const beginsGroup = (groups.length > 1 || labelIndex > 0) && (index === 0 || (groupByPlayer.get(orderedPlayers[index - 1].playerId) ?? 0) !== groupIndex);
       return html`<${Fragment} key=${p.playerId}>
         ${beginsGroup ? html`<div class="team__group-label" data-group=${labelIndex}>${t('第 {number} 组', { number: labelIndex + 1 })}</div>` : null}

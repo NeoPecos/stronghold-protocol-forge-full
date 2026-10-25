@@ -4,7 +4,11 @@ import { t } from '../../../shared/i18n.js';
 import { html } from '../ui/components.js';
 import { net } from '../net.js';
 import { toastError } from '../ui/toasts.js';
+import { savePref } from '../store.js';
 import * as roomMods from '../roomMods.js';
+
+/** 房主上一次启用的 DLC 组合（本地记忆，房间建立时 room.js 会自动套回，见 DLC_PREF_FOLLOW）。 */
+const DLC_PREF = 'dlc.last';
 
 /** A separate room page; the server decides the effective pack set. */
 export function DlcPage({ room, myId, onClose }) {
@@ -22,8 +26,13 @@ export function DlcPage({ room, myId, onClose }) {
   const change = async (id, on) => {
     if (busy || !host || locked) return;
     setBusy(id);
-    try { await net.request('room.setDlc', { id, on }); }
-    catch (error) { toastError(error); }
+    try {
+      await net.request('room.setDlc', { id, on });
+      // 记下房主这次的选择：下一间新房默认套回同一组 DLC（用户要求：上一局开的，下一局不关就该还开着）。
+      const next = new Set(enabled);
+      if (on) next.add(id); else next.delete(id);
+      savePref(DLC_PREF, { ids: [...next] });
+    } catch (error) { toastError(error); }
     finally { setBusy(null); }
   };
   const consent = async () => {

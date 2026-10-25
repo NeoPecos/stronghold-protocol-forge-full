@@ -1,4 +1,25 @@
 /* Forge-only in-match controls kept alongside the main server's visual layer. */
+/* Match the main-server roster: scroll the list, keep group labels and rows at full height. */
 .team { max-height: calc(100dvh - 3.9rem); }
-.team__list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.team__list { flex: 1 1 auto; min-height: 0; overflow-y: visible; }
+.team--scrollable .team__list {
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+  scrollbar-color: var(--mint-700) transparent;
+}
+.team__list > * { flex-shrink: 0; }
+.team [data-group="0"] { --group-accent: #49d6b2; }
+.team [data-group="1"] { --group-accent: #efb94f; }
+.team [data-group="2"] { --group-accent: #66b8f0; }
+.team [data-group="3"] { --group-accent: #b79af2; }
+.team [data-group="4"] { --group-accent: #ec8f9c; }
+/* 头像：竖向图按上端对齐，避免头顶被 cover 居中裁掉 */
+.pavatar__img img { object-position: 50% 8%; }
 .gtop__clock .speedbtn { flex: none; }
+
+/* Main-server top bar: no legacy capsule entrance layered over the current frame. */
+.gtop__center { animation: none; }
+
+/* Main-server custom top-bar art, served alongside UI so native clients and asset mirrors can load it. */
+.gtop__meter { background-image: url('/ui-custom/topbar/frame_mid_fork_030.png'); }
+.capsule--rest-art { background-image: url('/ui-custom/topbar/bg_rest_fork_030.png'); }

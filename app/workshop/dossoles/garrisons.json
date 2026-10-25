@@ -97,7 +97,9 @@
   "bb": {
    "layer": 6
   },
-  "bbStr": {},
+  "bbStr": {
+   "conditionkey": "character_target_inboard"
+  },
   "owners": [
    "chess_ws_dos_lin_a"
   ]
@@ -116,7 +118,9 @@
   "bb": {
    "layer": 12
   },
-  "bbStr": {},
+  "bbStr": {
+   "conditionkey": "character_target_inboard"
+  },
   "owners": [
    "chess_ws_dos_lin_b"
   ]
@@ -177,7 +181,9 @@
   "bb": {
    "count": 1
   },
-  "bbStr": {},
+  "bbStr": {
+   "conditionkey": "character_target_inboard"
+  },
   "owners": [
    "chess_ws_dos_takila_a"
   ]
@@ -196,7 +202,9 @@
   "bb": {
    "count": 2
   },
-  "bbStr": {},
+  "bbStr": {
+   "conditionkey": "character_target_inboard"
+  },
   "owners": [
    "chess_ws_dos_takila_b"
   ]

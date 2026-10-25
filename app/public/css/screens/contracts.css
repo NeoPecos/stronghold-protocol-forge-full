@@ -49,6 +49,15 @@
 .ctrscreen__close {
   position: absolute; right: 0; top: 0; z-index: 3;
 }
+/* 2026-10-25(owner):右上角 X 在窄屏缩得太小 → 固定热区下限(触屏 32px),图标同步放大。 */
+.ctrscreen .ctrscreen__close {
+  width: max(.46rem, 32px); height: max(.46rem, 32px);
+  min-width: max(.46rem, 32px); padding: 0;
+  background: rgba(8, 12, 10, .55); border: 1px solid var(--line-3); color: var(--text-hi);
+}
+.ctrscreen .ctrscreen__close .btn__icon {
+  width: max(.18rem, 13px); height: max(.18rem, 13px);
+}
 .ctrscreen__title {
   margin: 0; font-family: var(--font-display); font-size: .34rem; letter-spacing: .13em;
   color: var(--text-hi);
@@ -401,17 +410,20 @@
 
 /* ---- 房间页入口按钮 ---- */
 .ctrbtn {
-  display: inline-flex; align-items: center; gap: .08rem;
-  padding: .06rem .16rem; font: inherit; font-size: max(.17rem, 11px); cursor: pointer;
-  color: var(--text-lo); background: rgba(10, 13, 12, .9);
-  border: 1px solid var(--line-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: .07rem;
+  height: .36rem; min-width: .36rem; padding: 0 .14rem;
+  font-size: calc(.15 * var(--t)); font-weight: 700; letter-spacing: .06em; line-height: 1;
+  white-space: nowrap; cursor: pointer;
+  color: #fff; background: var(--red);
+  border: 1px solid var(--red);
 }
-.ctrbtn:hover { color: var(--amber); border-color: var(--amber); }
-.ctrbtn.is-on { color: var(--amber); border-color: var(--amber); background: rgba(246, 163, 41, .12); }
-.ctrbtn .icon { width: .2rem; height: .2rem; }
+.ctrbtn:hover { color: var(--amber); border-color: var(--amber); background: rgba(10, 13, 12, .9); }
+.ctrbtn.is-on { color: #fff; border-color: var(--red); background: var(--red); }
+.ctrbtn.is-on:hover { color: var(--amber); border-color: var(--amber); background: rgba(10, 13, 12, .9); }
+.ctrbtn .icon { width: .18rem; height: .18rem; }
 .ctrbtn--compact { display: none; }
 @media (max-width: 900px) {
-  .ctrbtn--compact { display: inline-flex; padding: .07rem .1rem; }
+  .ctrbtn--compact { display: inline-flex; padding: 0 .1rem; font-size: calc(.14 * var(--t)); }
   .ctrbtn--compact .ctrbtn__label { display: inline; white-space: nowrap; }
 }
 .ctrbtn__pts {
@@ -809,53 +821,29 @@
  *
  * 1240px 是试出来的:再窄下去中间栏就压到最小宽度、合约说明一行放不下几个字。
  */
-@media (max-width: 1240px) {
-  .ctrscreen__body {
-    grid-template-columns: minmax(0, 12rem) minmax(2.6rem, 3.2rem);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "list side"
-      "actions actions";
-  }
-  /* 没选合约(渲染的是空态提示)→ 整栏收掉 */
-  .ctrdetail:not(:has(.ctrdetail__head)) { display: none; }
-  /* 选了合约 → 这一栏本身变成底部那一行,只留「返回」 */
-  .ctrdetail:has(.ctrdetail__head) {
-    grid-area: actions; display: block;
-    padding: 0; background: none; border: 0; overflow: visible;
-  }
-  .ctrdetail__head, .ctrdetail__body, .ctrdetail__accepted,
-  .ctrdetail__req, .ctrdetail__act > .btn:not(.ctrdetail__back) { display: none; }
-  /* 宽屏藏起来的「返回」在窄屏放回来 */
-  .ctrdetail__act .ctrdetail__back { display: inline-flex; }
-  .ctrdetail__act { margin: 0; padding: 0; justify-content: flex-end; }
-  /* 「完成」那一行整个藏掉 —— 它和这一栏抢同一个 grid 区 */
-  .ctrscreen__actions { display: none; }
-}
+/* 2026-10-25(owner):窄屏不再收掉中间栏 —— 任何尺寸都保持三栏(列表 · 说明 · 已开启)
+   与右下角「完成」；三栏宽度本来就是 rem，根字号已随视口等比缩放，窄屏只需整体缩小。
+   原规则:<=1240px 改两栏 / 隐藏 .ctrdetail / 隐藏 .ctrscreen__actions。 */
 
-/* 手机:单列,总分挪到顶部 */
+/* 手机/触屏:只在最窄档省一点内边距、标题略大；**布局仍是三栏**
+   (2026-10-25 owner:不管什么情况都像宽屏那样显示)。 */
 @media (max-width: 720px), (pointer: coarse) {
   .ctrscreen { padding: .2rem .22rem; }
   .ctrscreen__title { font-size: .38rem; }
-  .ctrscreen__body { grid-template-columns: 1fr; }
-  .ctrscreen__side { position: static; }
-  /* 只读弹窗的纵向「查看详情」在窄屏改成横排 —— 那个按钮已删,这条规则一并去掉。 */
-  /* 窄屏上"已开启"那一栏不再限高(它下面没有别的东西了) */
   .ctrchosen__scroll { max-height: 1.8rem; }
 }
 
 /* On a narrow screen, selecting a tile opens its detail over the tree. The
    earlier two-column layout hid both the explanation and its enable switch. */
-@media (max-width: 1240px) {
-  .ctrdetail:has(.ctrdetail__head) {
-    position: fixed; inset: 8% 5%; z-index: 5; grid-area: auto;
-    display: flex; flex-direction: column; overflow-y: auto;
-    padding: .2rem .22rem; background: #111715;
-    border: 1px solid var(--amber); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .72);
-  }
-  .ctrdetail__head { display: flex; }
-  .ctrdetail__body { display: flex; }
-  .ctrdetail__accepted, .ctrdetail__req { display: block; }
-  .ctrdetail__act { margin-top: auto; display: flex; gap: .1rem; justify-content: flex-end; }
-  .ctrdetail__act > .btn:not(.ctrdetail__back) { display: inline-flex; }
-}
+/* 2026-10-25(owner):窄屏点词条不再弹覆盖层(fixed 大页面) ——
+   中间栏常驻显示说明，双击启用/关闭才不会被覆盖层吃掉第二下点击。 */
+
+
+/* ---- 顶栏拥挤时整行/整组换行 ---------------------------------------------------------------
+   2026-10-25：DLC 入口与危机合约按钮缩到 .btn--sm 规格后，窄视口仍可能横向排不下；
+   这两条保证任何一项都不会被挤出视口（表现=换行，而不是消失）。 ----------------------------- */
+.rs-top { flex-wrap: wrap; row-gap: .08rem; }
+.rs-top__left { flex-wrap: wrap; row-gap: .08rem; }
+.rs-tools { flex-wrap: wrap; row-gap: .08rem; }
+.rs-top__right { flex-wrap: wrap; row-gap: .06rem; }
+.rs-dlc-entry, .ctrbtn { flex: none; }

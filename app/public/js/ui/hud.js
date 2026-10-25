@@ -117,9 +117,11 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
       ${phase === PHASE.UNITE && Number.isFinite(miss) ? html`<${MissTag} n=${miss} />` : null}
     </div>`;
   }
-  return html`<div class="capsule capsule--prep" role="status">
+  const label = prepCapsuleLabel(phase);
+  return html`<div class=${cx('capsule', 'capsule--prep', phase === PHASE.PREP && 'capsule--rest-art')}
+    role="status" aria-label=${label}>
     <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
-    <span class="capsule__label">${prepCapsuleLabel(phase)}</span>
+    <span class="capsule__label">${label}</span>
   </div>`;
 }
 

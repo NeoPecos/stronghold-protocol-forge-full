@@ -10,7 +10,6 @@
 import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { CoinGlyph } from './gameComponents.js';
-import { PixBot } from './pixbots.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -47,11 +46,23 @@ export function useTimedLeave(ms, onDone) {
 }
 
 /** The plate's left block: corner crosses, side brackets, the drawing(s) and a line of fine type under them. */
+function MainRoundFigure() {
+  return html`<svg class="mpop__bot mpop__bot--0" viewBox="0 0 170 150" fill="none">
+        <path d="M69 98h43v28H69zM70 121h16v22H70zM97 121h16v22H97z" fill="currentColor"/>
+        <path d="M46 26h71l11 11v57l-11 11H46L35 94V37z" fill="currentColor"/>
+        <path d="M66 61h12v12H66zM97 61h12v12H97z" fill="#0a302b"/>
+        <path d="m16 84 41-8 10 58-42 9z" fill="currentColor" stroke="#0a302b" stroke-width="5" stroke-linejoin="bevel"/>
+        <path d="m18 85 29-5 9 48" stroke="#0a302b" stroke-width="4"/>
+        <path d="m126 98 30 9-5 17-27-9z" fill="currentColor"/>
+        <path d="M19 39h7v7h-7zM31 18h8v8h-8zM140 25h8v8h-8zM153 49h7v7h-7z" fill="currentColor"/>
+      </svg>`;
+}
+
 function PopArt({ kinds, tag }) {
   return html`<div class="mpop__art" aria-hidden="true">
     <i class="mpop__x mpop__x--tl"></i><i class="mpop__x mpop__x--tr"></i><i class="mpop__x mpop__x--bl"></i><i class="mpop__x mpop__x--br"></i>
     <i class="mpop__brk mpop__brk--l"></i><i class="mpop__brk mpop__brk--r"></i>
-    <span class="mpop__bots">${kinds.map((k, i) => html`<${PixBot} key=${i} kind=${k} class=${`mpop__bot mpop__bot--${i}`} />`)}</span>
+    <span class="mpop__bots"><${MainRoundFigure} /></span>
     <span class="mpop__tag">${tag}</span>
   </div>`;
 }
@@ -88,18 +99,27 @@ export function RoundPopup({ round, gain = null, left = null, onDone }) {
  * @param {{ tone?: 'mint'|'orange'|'red'|'gold', kinds?: string[], title: any, sub?: any, micro?: string, chev?: boolean,
  *   duration?: number, onDone?: Function }} props
  */
-export function PhasePopup({ tone = 'mint', kinds = ['bot'], title, sub = null, micro = '', chev = false, duration = 2200, onDone }) {
-  const leaving = useTimedLeave(duration, onDone);
-  return html`<div class=${cx('mpop', 'mpop--phase', `mpop--${tone}`, chev && 'has-chev', leaving && 'is-leaving')} role="status" aria-live="polite"
-      data-testid="phase-popup">
-    <div class="mpop__panel">
-      <${PopArt} kinds=${kinds} tag=${micro} />
-      <div class="mpop__text">
-        <span class="mpop__title">${title}</span>
-        ${sub ? html`<span class="mpop__sub">${sub}</span>` : null}
-      </div>
-      ${chev ? html`<span class="mpop__chevs" aria-hidden="true"><i></i><i></i><i></i></span>` : null}
-      <span class="mpop__deco" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+export function PhasePopup({ title, sub, duration = 3400, onDone }) {
+  const [leaving, setLeaving] = useState(false);
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    const hideTimer = setTimeout(() => setLeaving(true), duration);
+    const doneTimer = setTimeout(() => { setGone(true); onDone?.(); }, duration + 360);
+    return () => { clearTimeout(hideTimer); clearTimeout(doneTimer); };
+  }, [duration]);
+  if (gone) return null;
+  const smile = '/assets/ui/hudPanel/trans_coop1.png';
+  const frown = '/assets/ui/hudPanel/trans_coop3.png';
+  return html`<div class=${cx('unite-intro', leaving && 'is-leaving')} style=${`--unite-intro-ms:${duration + 360}ms`}
+    role="status" aria-live="polite" aria-label=${sub ? `${title}，${sub}` : title}>
+    <div class="unite-intro__top" aria-hidden="true">
+      <span class="unite-intro__top-icons"><img src=${smile} alt="" /><img src=${frown} alt="" /></span>
+      <span class="unite-intro__top-label">${t('联防')} ${t('开始')}</span>
+    </div>
+    <div class="unite-intro__plate">
+      <span class="unite-intro__faces" aria-hidden="true"><img src=${smile} alt="" /><img src=${frown} alt="" /></span>
+      <strong class="unite-intro__title">${title}</strong>
+      <span class="unite-intro__arrows" aria-hidden="true"><i></i><i></i></span>
     </div>
   </div>`;
 }
@@ -111,13 +131,8 @@ export function PhasePopup({ tone = 'mint', kinds = ['bot'], title, sub = null, 
  * @param {string} phase @param {{ title: any, sub?: any, micro?: string, tone?: string } | null} banner
  */
 export function phasePopupOf(phase, banner) {
-  if (!banner) return null;
-  switch (phase) {
-    case 'UNITE': return { tone: 'orange', kinds: ['happy', 'worried'], chev: true, duration: 2600, ...pick(banner) };
-    case 'SP_DRAFT': return { tone: 'gold', kinds: ['bot'], chev: false, duration: 1800, ...pick(banner) };
-    case 'HIDDEN_CORE': return { tone: 'red', kinds: ['worried'], chev: true, duration: 2600, ...pick(banner) };
-    default: return null;
-  }
+  if (!banner || phase !== 'UNITE') return null;
+  return { tone: 'orange', faces: true, chev: true, duration: 3400, ...pick(banner) };
 }
 const pick = (b) => ({ title: b.title, sub: b.sub || null, micro: b.micro || '' });
 

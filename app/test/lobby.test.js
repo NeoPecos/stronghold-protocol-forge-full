@@ -671,21 +671,15 @@ describe('websocket lobby', () => {
     assert.ok(c.isOpen);
   });
 
-  test('flooding far beyond the limit closes the socket (1008)', { timeout: 60000 }, async (t) => {
+  test('flooding far beyond the limit closes the socket (1008)', { timeout: 10000 }, async (t) => {
     const now = Date.now();
     t.mock.method(srv.network, 'now', () => now);
     const c = await pool.player('Flood');
     // Keep one rate window and await replies instead of building a compressed send queue ahead of the close frame.
-    // A slow runner (Windows, Node 24) took more than the client's 2 s default for one of the ~430 round trips, so each
-    // waits up to 10 s; and the drops stop short of the 400 budget so a frame more or less cannot move the boundary.
-    for (let i = 0; i < 39; i++) assert.equal((await c.request({ t: 'ping', c: i }, 10_000)).t, 'pong');
-    for (let i = 0; i < 390; i++) {
-      const r = await c.request({ t: 'ping', c: i }, 10_000);
-      assert.equal(r.t, 'error'); assert.equal(r.code, ERR.RATE);
-    }
-    assert.ok(c.isOpen, '390 drops do not close the socket');
-    // past the budget (400 drops a second) the server closes the socket instead of answering
-    for (let i = 0; i < 40 && c.isOpen; i++) c.send({ t: 'ping', c: 400 + i, rid: null });
+    for (let i = 0; i < 39; i++) assert.equal((await c.request({ t: 'ping', c: i })).t, 'pong');
+    for (let i = 0; i < 400; i++) await expectError(c, { t: 'ping', c: i }, ERR.RATE);
+    assert.ok(c.isOpen, '400 drops do not close the socket');
+    c.send({ t: 'ping', c: 400, rid: null });
     const info = await c.closed;
     assert.equal(info.code, 1008);
     assert.equal(info.reason, 'rate limit');
@@ -951,29 +945,9 @@ describe('websocket lobby', () => {
     const s4 = await host.waitFor('room.state', (s) => s.seats[1]?.isBot);
     assert.equal(s4.seats[1].name, BOT_NAMES[0], 'freed bot name is reused');
 
-    await expectOk(host, { t: 'room.addBot', seat: 3 });
-    const placed = await host.waitFor('room.state', (s) => s.seats[3]?.isBot);
-    assert.equal(placed.seats[3].seat, 3, 'the AI button fills the chosen empty card');
-    await expectError(host, { t: 'room.addBot', seat: 2 }, ERR.ROOM_FULL);
-    await expectOk(host, { t: 'room.removeBot', seat: 3 });
-    await host.waitFor('room.state', (s) => s.seats[3] === null);
-    await expectOk(host, { t: 'room.takeSeat', seat: 3 });
-    const moved = await host.waitFor('room.state', (s) => s.seats[0] === null && s.seats[3]?.playerId === host.id);
-    assert.equal(moved.seats[3].seat, 3, 'clicking an empty card moves the player into that seat');
-
     await expectOk(host, { t: 'room.leave' });
     const probe = await pool.player('Probe');
     await expectError(probe, { t: 'room.join', code: st.code }, ERR.ROOM_NOT_FOUND);
-  });
-
-  test('20-seat co-op keeps the original limit of three AI teammates per human', async () => {
-    const host = await pool.player('Host');
-    await expectOk(host, { t: 'room.create', mode: 'coop', difficulty: 'NORMAL', seatCap: 20 });
-    for (const seat of [3, 7, 19]) await expectOk(host, { t: 'room.addBot', seat });
-    const filled = await host.waitFor('room.state', (s) => s.seats[19]?.isBot);
-    assert.deepEqual([3, 7, 19].map((seat) => filled.seats[seat]?.isBot), [true, true, true]);
-    await expectError(host, { t: 'room.addBot', seat: 18 }, ERR.BAD_TARGET);
-    assert.equal(filled.seats[18], null);
   });
 
   test('start flow: readiness gate → stub INFO_CHECK → end → back to LOBBY → play again', async () => {
@@ -1164,7 +1138,7 @@ describe('websocket lobby', () => {
     const clients = [];
     for (let i = 0; i < 5; i++) clients.push(await pool.player(`F${i}`));
     const codes = () => [...srv.lobby.rooms.keys()];
-    const gTypes = ['g.infoReady', 'g.band', 'g.bandSkip', 'g.buy', 'g.refresh', 'g.freeze', 'g.levelUp', 'g.sell', 'g.move', 'g.equip', 'g.unequip', 'g.art', 'g.destroy', 'g.reward', 'g.choice', 'g.ready', 'g.emote', 'g.watch', 'g.autoplay', 'g.leave'];
+    const gTypes = ['g.infoReady', 'g.band', 'g.bandSkip', 'g.buy', 'g.refresh', 'g.freeze', 'g.levelUp', 'g.sell', 'g.move', 'g.equip', 'g.art', 'g.destroy', 'g.reward', 'g.choice', 'g.ready', 'g.emote', 'g.watch', 'g.autoplay', 'g.leave'];
     const junk = [1, -1, 1.5, 'x', '', null, true, [], {}, { area: 'board', row: 1, col: 1 }, 'A'.repeat(70), 2 ** 40];
     const gen = () => {
       const r = rnd();

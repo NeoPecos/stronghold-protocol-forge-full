@@ -168,6 +168,9 @@ export function registerMeta(registry) {
     onPrepEnd(ctx) {
       const { piece, holder } = ctx.source;
       if (!piece || !holder || holder.kind !== 'chess') return;
+      // 场下携带者不触发：equipped items 的派发遍历 ownedChess（含备战席），没有 where 字段，
+      // 与 garrison 的 conditionkey: character_target_inboard 同口径只认棋盘上的携带者。
+      if (!ctx.board().some((p) => p && p.uid === holder.uid)) return;
       const n = int(itemParams(recOf(ctx, piece)).count, 5);
       if (n <= 0) return;
       for (const b of ctx.pieceBonds(holder.uid)) ctx.addLayers(b, n, { requireActive: true, reason: 'item' });

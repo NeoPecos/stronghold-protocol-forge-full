@@ -25,7 +25,6 @@ import { ResumeMatchButton } from '../ui/resumeMatch.js';
 import { AnnouncementButton } from '../ui/announcements.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, DEFAULT_SEATS, ROOM_CAPACITIES, MIN_SEATS, MAX_SPECTATORS, modeIdFor, clampSeats, ERR, ERR_TEXT, RECON } from '../../../shared/constants.js';
-import { rememberedCapacity, remembersCapacity, setCapacityRemember } from '../ui/roomPrefs.js';
 import { RANDOM_MODE } from '../../../shared/randomMode.js';
 import { html, Button, Icon, MicroLabel, Panel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
@@ -311,6 +310,15 @@ export function recentRooms() {
 }
 
 /** @param {string} code */
+// 房间界面退出后回到「选择同盟方式」页（m07233）：一次性信号，LobbyScreen 挂载时消费一次即清。
+let pendingAllianceSheet = false;
+export function requestAllianceSheet() { pendingAllianceSheet = true; }
+function consumeAllianceSheet() {
+  const v = pendingAllianceSheet;
+  pendingAllianceSheet = false;
+  return v;
+}
+
 export function rememberRoom(code) {
   if (!CODE_RE.test(code)) return;
   savePref('recentRooms', [code, ...recentRooms().filter((c) => c !== code)].slice(0, 4));
@@ -593,41 +601,8 @@ function JoinLine({ text }) {
 }
 
 /**
- * 房主决定本同盟开几张座位卡 (业主裁决 B5): a range input, with the current value, the server's ceiling and the two
- * ends spelled out. **Only rendered for co-op** (a solo room has no seat count to choose) and only when the range has
- * something to choose (`max > min`) — on a server whose ceiling is the floor there is nothing to pick, so the picker
- * disappears rather than showing a dead slider.
- *
- * This is the ONLY seat-cap surface: it lives in the lobby (which is a host's screen), never in the room screen, where
- * the cap is already fixed and `room.state.seatCap` merely describes it.
- * @param {{ value: number, min: number, max: number, onChange: (n: number) => void }} props
- */
-function SeatCapPicker({ value, min, max, onChange, mode = 'coop' }) {
-  if (!(max > min)) return null;
-  const choices = null;
-  const [remember, setRemember] = useState(remembersCapacity);
-  const pct = Math.round(((value - min) / (max - min)) * 100);
-  return html`<div class="seat-cap">
-    <div class="seat-cap__head">
-      <${MicroLabel} tone="mint">SEATS<//>
-      <span class="seat-cap__name">${t('本房间人数上限')}</span>
-      <span class="seat-cap__value num">${value}<span class="t-dim"> / ${max}</span></span>
-    </div>
-    ${choices ? html`<div class="seat-cap__choices" role="radiogroup" aria-label=${t('本房间人数上限')}>
-      ${choices.map((n) => html`<button type="button" class=${`seat-cap__choice${n === value ? ' is-on' : ''}`}
-        role="radio" aria-checked=${n === value} onClick=${() => onChange(n)}>${n}</button>`)}</div>
-      <label class="seat-cap__remember"><input type="checkbox" checked=${remember}
-        onChange=${(e) => { const on = e.currentTarget.checked; setRemember(on); setCapacityRemember(on, value); }} />${t('记住本次选择')}</label>` : html`<input class="seat-cap__slider" type="range" min=${min} max=${max} step="1" value=${value}
-      style=${`--pct:${pct}%`} aria-label=${t('本房间人数上限')}
-      aria-valuemin=${min} aria-valuemax=${max} aria-valuenow=${value}
-      onInput=${(e) => onChange(Number(e.currentTarget.value))} />`}
-    <div class="seat-cap__note">${t('服务器允许最多 {max} 人；本同盟开 {value} 张座位卡', { max, value })}</div>
-  </div>`;
-}
-
-/**
  * 重构模拟（模式扩展-重构模拟，mode 'recon'）的队数选择：房主建房时定 1..RECON.MAX_TEAMS 支队伍（每队
- * ≤ RECON.TEAM_SIZE 人），队内分配进房后自由选（room.setTeam）。只在 recon 的创建屏渲染；与 SeatCapPicker
+ * ≤ RECON.TEAM_SIZE 人），队内分配进房后自由选（room.setTeam）。只在 recon 的创建屏渲染；与房间内的人数滑条
  * 同一个滑条语言。缺省 1 队（全队合作）—— 与服务器 `Room` 的缺省一致。
  * @param {{ value: number, onChange: (n: number) => void }} props
  */
@@ -761,7 +736,7 @@ export function ProtoCard({ roomMode, difficulty, selected, onSelect, matchmakin
  */
 function ProtocolSelect({ card, roomMode, random, variant, difficulty, onDifficulty, onClose, matchmaking, brief, privateRoom, onPrivate,
   online, maint, busy, isSearching, onCreate, onQueue, purpose = 'create', onSearch, onCancel, mm, onBrowse, chained = false,
-  seatValue, seatRange, onSeatPick, selectedMods, onToggleMod, queue, onQuickMatch, onCancelQuickMatch, teamCount, onTeamPick }) {
+  selectedMods, onToggleMod, queue, onQuickMatch, onCancelQuickMatch, teamCount, onTeamPick }) {
   const [leaving, leave] = useLeave(onClose);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.modal, .guide')) leave(); };
@@ -777,7 +752,7 @@ function ProtocolSelect({ card, roomMode, random, variant, difficulty, onDifficu
   // server's card must not still promise 「至多 3 名博士」. The number is read at render time, so a `welcome` that lands
   // after the module was evaluated (or a reconnect that changes servers) is reflected; the msgid and its `{n}` params
   // are unchanged (only the VALUE moves), so every i18n pack keeps working.
-  const seats = card.id === 'coop' ? serverSeatMaxOf() : MAX_SEATS;
+  const seats = card.id === 'coop' ? Math.min(DEFAULT_SEATS, serverSeatMaxOf()) : MAX_SEATS;
   const params = card.id === 'coop' ? { n: Math.max(1, seats - 1) } : card.params;
   const pointParams = card.id === 'coop' ? { n: seats } : card.pointParams;
   const info = difficultyInfo(roomMode, difficulty, { random, variant });
@@ -853,9 +828,6 @@ function ProtocolSelect({ card, roomMode, random, variant, difficulty, onDifficu
               onClick=${onQuickMatch}>${t('快速匹配')}<//>` : null}
           </div>` : null}
           ${hasRoomModPicker(roomMode) ? html`<${ModPicker} selected=${selectedMods} onToggle=${onToggleMod} />` : null}
-          ${roomMode === 'coop' || roomMode === 'recon'
-            ? html`<${SeatCapPicker} value=${seatValue} min=${seatRange.min} max=${seatRange.max} mode=${roomMode} onChange=${onSeatPick} />`
-            : null}
           ${roomMode === 'recon' ? html`<${TeamCountPicker} value=${teamCount} onChange=${onTeamPick} />` : null}
           ${queue ? html`<${QuickMatchPanel} queue=${queue} busy=${busy} onCancel=${onCancelQuickMatch} />` : null}
           <p class="proto-hint">${hint}</p>
@@ -878,7 +850,7 @@ function ProtocolSelect({ card, roomMode, random, variant, difficulty, onDifficu
  * at the bottom left. Esc or ‹ returns to the hub.
  */
 function AllianceSelect({ onClose, code, onCode, codeOk, recent, online, maint, busy, onCreate, onJoin, onSpectate, onBrowse, onSearch, recruiting = 0, difficulty,
-  roomMode, seatValue, seatRange, onSeatPick, selectedMods, onToggleMod, queue, onQuickMatch, onCancelQuickMatch }) {
+  roomMode, selectedMods, onToggleMod, queue, onQuickMatch, onCancelQuickMatch }) {
   const [leaving, leave] = useLeave(onClose);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.modal, .guide')) leave(); };
@@ -901,9 +873,6 @@ function AllianceSelect({ onClose, code, onCode, codeOk, recent, online, maint, 
       </section>
       <section class="ally-side">
         ${hasRoomModPicker(roomMode) ? html`<${ModPicker} selected=${selectedMods} onToggle=${onToggleMod} />` : null}
-        ${roomMode === 'coop'
-          ? html`<${SeatCapPicker} value=${seatValue} min=${seatRange.min} max=${seatRange.max} mode=${roomMode} onChange=${onSeatPick} />`
-          : null}
         <button type="button" class="ally-card ally-card--create" disabled=${!online || maint?.active || busy === 'create'} onClick=${onCreate}>
           <span class="ally-card__art"><${CreateArt} /></span>
           <span class="ally-card__bar"><span class="ally-card__icon"><${Icon} name="plus" /></span>${maint?.active ? t('维护中 · 暂停开局') : t('创建同盟')}
@@ -1088,15 +1057,8 @@ export function LobbyScreen() {
   const [privateRoom, setPrivateRoom] = useState(false);
   const [busy, setBusy] = useState(null);
   const [recent] = useState(recentRooms);
-  // 本房座位上限 (业主裁决 B5): `seatMax` = the ceiling this server announced, `seatPick` = the host's move of the
-  // slider. `null` means "not moved": the pick then IS the ceiling, which is the pre-B5 room and sends no field at all
-  // (`seatCapPayload`). Keeping the ceiling in state (not a module read at render time) is what makes a reconnect that
-  // announces a different ceiling actually re-render the slider.
-  const [seatMax, setSeatMax] = useState(() => serverSeatMaxOf());
-  const [seatPick, setSeatPick] = useState(() => rememberedCapacity() ?? serverSeatMaxOf());
-  const seatRange = seatCapRange(seatMax);
-  const seatValue = clampSeats(seatPick, seatRange.max);
-  const pickSeats = (n) => { setSeatPick(n); if (roomMode === 'coop' && remembersCapacity()) setCapacityRemember(true, n); };
+  // 本房座位上限 (业主裁决 B5，2026-10-25 修订): 建房页不再提供人数滑条 —— 新建的房间一律 DEFAULT_SEATS(4) 座，
+  // 上一次选择过的容量也不再记忆；想要更多人请在房间内由房主调（`room.setSeatCap`，服务端 `Lobby.setSeatCap`）。
   // 重构模拟（mode 'recon'）的队数：房主在创建屏钉下（缺省 1 队，与服务器 `Room` 的缺省一致），
   // 只随 recon 的 `room.create` 上车（`teamCount`），其它模式的负载一个字节不多。
   const [teamPick, setTeamPick] = useState(RECON.MIN_TEAMS);
@@ -1121,14 +1083,6 @@ export function LobbyScreen() {
       setQueue(null);
       if (msg.status === 'timeout') toast(t('快速匹配超时：没有等到足够的博士，请稍后再试'), 'warn');
     });
-  }, []);
-  useEffect(() => {
-    // 本房座位上限 (业主裁决 B5): the slider mirrors the CURRENT server. The module-scope listener above keeps the cache
-    // fresh while this screen is unmounted (the handshake usually lands on the title screen), and this one syncs the
-    // mounted component — including a reconnect that announces a different ceiling.
-    const sync = () => { if (alive.current) setSeatMax(serverSeatMaxOf()); };
-    sync();
-    return net.on('welcome', sync);
   }, []);
 
   const resourcesReady = useStore((s) => !s.session.preloadRequired || s.session.preloadReady);
@@ -1244,7 +1198,7 @@ export function LobbyScreen() {
   // untouched slider (and every solo room) adds no key, so this request is the one this client always sent.
   const create = () => run('create', () => net.request('room.create', {
     ...roomMods.buildCreatePayload(roomMode, difficulty),
-    ...seatCapPayload(roomMode, seatValue, seatMax),
+    ...seatCapPayload(roomMode, roomMode === 'coop' ? DEFAULT_SEATS : serverSeatMaxOf(), serverSeatMaxOf()),
     ...(roomMode === 'recon' ? { teamCount: teamPick } : {}),
     random: randomMode, private: roomMode !== 'solo' && privateRoom, ...(randomMode ? { variant } : {}),
   }));
@@ -1336,7 +1290,7 @@ export function LobbyScreen() {
   // hub dialogs: the start sheet of a picked mode, 密钥加入 (opened by an invite code in the URL too)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetPurpose, setSheetPurpose] = useState('create'); // 'create' | 'search' (搜寻队友)
-  const [allyOpen, setAllyOpen] = useState(false);            // 选择同盟方式
+  const [allyOpen, setAllyOpen] = useState(consumeAllianceSheet);            // 选择同盟方式
   const [sheetChained, setSheetChained] = useState(false);    // opened from 选择同盟方式: no darkening of the hub between
   const [joinOpen, setJoinOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);              // 成就统计 (ui/achievements.js)
@@ -1414,7 +1368,6 @@ export function LobbyScreen() {
         ${maint?.active ? html`<div class="hub-maint">${t('服务器即将维护，暂停开启新的模拟')}</div>` : null}
         <div class="hub-entries__row">
           ${devAllowed ? html`<${HubEntry} name=${t('全量模拟')} en="FULL SIMULATION" icon="rook" tone="green" onClick=${() => openMode('full')} />` : null}
-          ${devAllowed ? html`<${HubEntry} name=${t('重构模拟')} en="RECON SIMULATION" iconSrc=${RECON_ICON} tone="ice" onClick=${() => openMode('recon')} />` : null}
           <${HubEntry} group=${{ icon: 'user', label: t('独立模拟') }} name=${t('独立模拟')} en="SOLO" icon="user" onClick=${() => openMode('solo')} />
           <${HubEntry} group=${{ icon: 'users', label: t('同盟模拟') }} name=${t('同盟模拟')} en="ALLIANCE" icon="users" count=${matchmakingCounts?.total} onClick=${() => openMode('coop')} />
           ${CAN_FIREPOWER ? html`<${HubEntry} name=${t('无限火力')} en="FIREPOWER" icon="dice" badge="1.1" tone="gold" onClick=${() => openMode('firepower')} />` : null}
@@ -1429,14 +1382,13 @@ export function LobbyScreen() {
       privateRoom=${privateRoom} onPrivate=${setPrivateRoom} online=${online} maint=${maint} busy=${busy} isSearching=${isSearching}
       onCreate=${simulation === 'full' ? createFullSim : create} onQueue=${async () => { await queueMatch(); setSheetOpen(false); }}
       purpose=${sheetPurpose} onSearch=${queueMatch} onCancel=${cancelMatch} mm=${mm} onBrowse=${() => setModalOpen(true)} chained=${sheetChained}
-      seatValue=${seatValue} seatRange=${seatRange} onSeatPick=${pickSeats}
       teamCount=${teamPick} onTeamPick=${setTeamPick}
       selectedMods=${selectedMods} onToggleMod=${toggleMod}
       queue=${queue} onQuickMatch=${quickMatch} onCancelQuickMatch=${cancelQueue} />` : null}
 
     ${allyOpen ? html`<${AllianceSelect} onClose=${() => setAllyOpen(false)} code=${code} onCode=${(v) => setCode(normalizeCode(v))} codeOk=${codeOk}
       recent=${recent} online=${online} maint=${maint} busy=${busy} difficulty=${difficulty} recruiting=${recruitingRooms(rooms).length}
-      roomMode=${roomMode} seatValue=${seatValue} seatRange=${seatRange} onSeatPick=${pickSeats}
+      roomMode=${roomMode}
       selectedMods=${selectedMods} onToggleMod=${toggleMod}
       queue=${queue} onQuickMatch=${quickMatch} onCancelQuickMatch=${cancelQueue}
       onCreate=${create} onJoin=${() => join()} onSpectate=${() => spectate()} onBrowse=${() => setModalOpen(true)} onSearch=${openSearch} />` : null}

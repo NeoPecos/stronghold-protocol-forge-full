@@ -39,11 +39,63 @@ export function mount(ctx) {
   box.append(head, body);
   host.appendChild(box);
 
+  // 拖动：标题行是把手（鼠标与触屏同一条 pointer 通道），整块面板跟手走；位置记进面板偏好
+  // （`ctx.session`，与收起/展开同一个口子），刷新后回到原处。窗口尺寸变化时再夹回视口内。
+  let pos = null;
+  const view = doc.defaultView;
+  const clampPos = (x, y) => {
+    const w = box.offsetWidth || 190;
+    const h = box.offsetHeight || 40;
+    const vw = view.innerWidth || 0;
+    const vh = view.innerHeight || 0;
+    return {
+      x: Math.max(2, Math.min(x, Math.max(2, vw - w - 2))),
+      y: Math.max(2, Math.min(y, Math.max(2, vh - h - 2))),
+    };
+  };
+  const place = (x, y, persist) => {
+    pos = clampPos(x, y);
+    box.style.left = pos.x + 'px';
+    box.style.top = pos.y + 'px';
+    box.style.bottom = 'auto';
+    if (persist) ctx.session.setPref('pos', { x: pos.x, y: pos.y });
+  };
+  const saved = ctx.session.getPref('pos', null);
+  if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') place(saved.x, saved.y, false);
+  const drag = { id: null, dx: 0, dy: 0 };
+  const stopDrag = (save) => {
+    if (drag.id === null) return;
+    drag.id = null;
+    box.classList.remove('is-dragging');
+    if (save && pos) ctx.session.setPref('pos', { x: pos.x, y: pos.y });
+  };
+  head.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target && typeof e.target.closest === 'function' && e.target.closest('.devext-panel__toggle')) return;
+    const r = box.getBoundingClientRect();
+    drag.id = e.pointerId;
+    drag.dx = e.clientX - r.left;
+    drag.dy = e.clientY - r.top;
+    box.classList.add('is-dragging');
+    if (typeof head.setPointerCapture === 'function') head.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  head.addEventListener('pointermove', (e) => {
+    if (drag.id === null || e.pointerId !== drag.id) return;
+    place(e.clientX - drag.dx, e.clientY - drag.dy, false);
+    e.preventDefault();
+  });
+  head.addEventListener('pointerup', (e) => { if (e.pointerId === drag.id) stopDrag(true); });
+  head.addEventListener('pointercancel', (e) => { if (e.pointerId === drag.id) stopDrag(true); });
+  const onResize = () => { if (pos) place(pos.x, pos.y, false); };
+  view.addEventListener('resize', onResize);
+
   let collapsed = ctx.session.getPref('collapsed', false) === true;
   const applyCollapsed = () => {
     box.classList.toggle('is-collapsed', collapsed);
     toggle.textContent = collapsed ? '展开' : '收起';
     toggle.setAttribute('aria-expanded', String(!collapsed));
+    if (pos) place(pos.x, pos.y, false);   // 收起后高度变小，重新夹回视口
   };
 
   const render = () => {
@@ -80,6 +132,7 @@ export function mount(ctx) {
   return {
     unmount() {
       doc.defaultView.clearInterval(timer);
+      view.removeEventListener('resize', onResize);
       box.remove();
     },
   };

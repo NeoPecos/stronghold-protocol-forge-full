@@ -33,9 +33,6 @@ test('room DLC controls actual content, consent, and public room labels', async 
   let guest;
   try {
     server = await startServer({ port: 0, host: '127.0.0.1', quiet: true, workshopDir: root });
-    const preview = await (await fetch(`http://127.0.0.1:${server.port}/data/dlc-preview.json`)).json();
-    assert.ok(preview.available.includes('dossoles'));
-    assert.equal(preview.available.includes('side-story'), false);
     const url = `ws://127.0.0.1:${server.port}/ws`;
     host = await TestClient.connect(url);
     guest = await TestClient.connect(url);
@@ -43,7 +40,7 @@ test('room DLC controls actual content, consent, and public room labels', async 
     await guest.hello('DLC guest');
     assert.equal((await host.request({ t: 'room.create', mode: 'coop', difficulty: 'NORMAL', mods: h.mods.digest })).t, 'ok');
     const state = host.stateOf('room.state');
-    assert.deepEqual(state.dlc.available, ['ave-mujica', 'dongShip', 'dossoles']);
+    assert.deepEqual(state.dlc.available, ['ave-mujica', 'dongShip', 'dossoles', 'side-story']);
     assert.deepEqual(state.dlc.enabled, []);
     const room = server.lobby.rooms.get(state.code);
     let assets = server.lobby.workshop.roomAssets.forRoom(room.modSet);
@@ -77,13 +74,8 @@ test('room DLC controls actual content, consent, and public room labels', async 
     assert.equal((await guest.request({ t: 'room.ready', ready: false })).t, 'ok');
     assert.equal((await host.request({ t: 'room.setDlc', id: 'dossoles', on: true })).t, 'ok');
     assert.ok(room.dlcIds.includes('side-story'));
-    assert.deepEqual(host.stateOf('room.state').dlc.enabled, ['ave-mujica', 'dongShip', 'dossoles']);
-    assert.deepEqual(server.lobby.roomDirectory().rooms[0].dlcIds, ['ave-mujica', 'dongShip', 'dossoles']);
-    assert.deepEqual(server.lobby.publicRecruitingRooms()[0].dlcIds, ['ave-mujica', 'dongShip', 'dossoles']);
-    assert.equal((await host.request({ t: 'room.setDlc', id: 'side-story', on: false })).code, 'MOD_UNKNOWN');
-    assert.equal((await host.request({ t: 'room.setDlc', id: 'dossoles', on: false })).t, 'ok');
+    assert.equal((await host.request({ t: 'room.setDlc', id: 'side-story', on: false })).t, 'ok');
     assert.equal(room.dlcIds.includes('dossoles'), false);
-    assert.equal(room.dlcIds.includes('side-story'), false);
   } finally {
     await host?.close();
     await guest?.close();

@@ -14,10 +14,17 @@
 
 :root {
   --sa-t: env(safe-area-inset-top, 0px);
-  --sa-r: env(safe-area-inset-right, 0px);
+  --sa-r: calc((env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)) / 2);
   --sa-b: env(safe-area-inset-bottom, 0px);
-  --sa-l: env(safe-area-inset-left, 0px);
+  --sa-l: calc((env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)) / 2);
   --tap-min: 44px;
+}
+
+/* 对称让步 (2026-10-25): 挖孔只在一边时两侧各让一半，画面保持居中（参考明日方舟本家）。
+   这里按让出后的可用宽高重算布局根字号；下限 24px 与原 A 补丁一致。 */
+html:not([data-fit]) {
+  font-size: clamp(24px, min(calc((100vw - var(--sa-l) - var(--sa-r)) / 19.2), calc((100dvh - var(--sa-t) - var(--sa-b)) / 10.8)), 240px);
+  font-size: clamp(24px, min(calc((100vw - var(--sa-l) - var(--sa-r)) / 19.2), calc((100svh - var(--sa-t) - var(--sa-b)) / 10.8)), 240px);
 }
 
 /* ---- 1. gestures ------------------------------------------------------------------------------------------------- */
@@ -124,7 +131,7 @@ html:not(.sp-in-match) .toast-host { margin-top: var(--sa-t); }
    desktop bottom (1.02rem) it hid ⚙ / 📖 / ⛶. (gameLogic panelSlots keeps the taller desktop slot: conservative.) */
 @media (max-width: 767px) {
   .gm__corner { flex-wrap: wrap-reverse; align-content: flex-start; width: max(72px, calc(3 * .56rem + .2rem)); }
-  .dpanel:not(.dpanel--right) { bottom: calc(.44rem + max(1.51rem, 72px) * 55 / 151 + .56rem); }
+  .dpanel:not(.dpanel--right) { bottom: calc(.44rem + 1.51rem * 55 / 151 + .56rem); }
 }
 @media (max-width: 767px) and (pointer: coarse), (max-width: 767px) and (any-pointer: coarse) {
   .gm__corner { width: max(96px, calc(3 * max(.56rem, 34px) + .2rem)); }
@@ -165,8 +172,8 @@ html:not(.sp-in-match) .toast-host { margin-top: var(--sa-t); }
    off). Only while <html data-fit> is set: with all four at 0 nothing here applies. The bands outside show the page
    background; fixed overlays (dialogs, toasts) still use the whole screen. */
 html[data-fit] {
-  font-size: clamp(40px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100vh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
-  font-size: clamp(40px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100svh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
+  font-size: clamp(24px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100vh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
+  font-size: clamp(24px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100svh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
 }
 /* the screens' own box (theme.css .app-root: fixed, inset 0) and the full-page panels fixed over the screens (统计,
    S.W.E.E.P., the protocol pages, 干员调配, 玩法说明, 成就统计) */
@@ -186,8 +193,8 @@ html[data-fit] :is(.app-root, .st, .sw, .proto, .lo, .guide, .ach) {
    off). Only while <html data-fit> is set: with all four at 0 nothing here applies. The bands outside show the page
    background; fixed overlays (dialogs, toasts) still use the whole screen. */
 html[data-fit] {
-  font-size: clamp(40px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100dvh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
-  font-size: clamp(40px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100svh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
+  font-size: clamp(24px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100dvh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
+  font-size: clamp(24px, min(calc((100vw - var(--fit-l, 0px) - var(--fit-r, 0px)) / 19.2), calc((100svh - var(--fit-t, 0px) - var(--fit-b, 0px)) / 10.8)), 240px);
 }
 /* the screens' own box (theme.css .app-root: fixed, inset 0) and the full-page panels fixed over the screens (统计数据,
    干员调配, 玩法说明) */

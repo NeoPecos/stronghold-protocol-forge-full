@@ -28,6 +28,22 @@ export function assetCdnOrigin(base = process.env.SP_CDN_BASE) {
   return u.protocol === 'http:' || u.protocol === 'https:' ? u.origin : null;
 }
 
+// 5 服：镜像资源服 a1/a2/a3 与站点不同 origin；`/assets/` 302 到镜像后 <img>/fetch 会被
+// img-src/connect-src/media-src 的 'self' 拒掉。SP_ASSET_MIRRORS（空格或逗号分隔的绝对
+// http(s) URL）里的 origin 只进这三条**被动**策略；script/style/frame/object 一律不放行。
+function assetMirrorOrigins(raw = process.env.SP_ASSET_MIRRORS) {
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  const out = [];
+  for (const token of raw.split(/[\s,]+/)) {
+    if (!token) continue;
+    let u;
+    try { u = new URL(token); } catch { continue; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') continue;
+    if (!out.includes(u.origin)) out.push(u.origin);
+  }
+  return out;
+}
+
 export function siteCsp(publicDir, cdnBase = process.env.SP_CDN_BASE) {
   const hashes = new Set();
   for (const rel of ['index.html', 'studio/index.html', 'studio/console.html', 'dev/game-mock.html', 'dev/render-demo.html', 'dev/battle-perf.html', 'dev/uikit.html']) {
@@ -43,11 +59,15 @@ export function siteCsp(publicDir, cdnBase = process.env.SP_CDN_BASE) {
   // It must NEVER reach `script-src` / `style-src` / `frame-src` / `object-src`: those would let a poisoned CDN run
   // code or load a frame, which is the whole point of the policy. `script-src` stays self + the importmap hashes.
   const cdn = assetCdnOrigin(cdnBase);
-  const imgSrc = `img-src 'self' data: blob:${cdn ? ` ${cdn}` : ''};`;
-  const connectSrc = `connect-src 'self'${cdn ? ` ${cdn}` : ''};`;
+  // 5 服镜像源（a1/a2/a3）：只进被动策略，和 CDN 同一条规矩。
+  const mirrors = assetMirrorOrigins();
+  const passive = [cdn, ...mirrors].filter(Boolean).join(' ');
+  const passiveSuffix = passive ? ` ${passive}` : '';
+  const imgSrc = `img-src 'self' data: blob:${passiveSuffix};`;
+  const connectSrc = `connect-src 'self'${passiveSuffix};`;
   // `media-src` 显式放行 `blob:`：本地上传的大厅音乐与「工坊曲目整段 fetch 成 Blob」的 Fever 音乐都靠它播放。
   // 没有这一条时它们落回 `default-src 'self'`，浏览器直接拒播（实测报错：Loading media from 'blob:…' violates
   // default-src 'self'）。音频与图片同属**被动**资源，所以 CDN 源也照 `img-src` 那条规矩进这里。
-  const mediaSrc = `media-src 'self' blob:${cdn ? ` ${cdn}` : ''};`;
+  const mediaSrc = `media-src 'self' blob:${passiveSuffix};`;
   return `default-src 'self'; script-src 'self'${hashes.size ? ' ' + [...hashes].join(' ') : ''}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${imgSrc} ${mediaSrc} ${connectSrc} worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'`;
 }

@@ -42,3 +42,8 @@
 }
 .devext-panel.is-collapsed { min-width: 0; }
 .devext-panel.is-collapsed .devext-panel__body { display: none; }
+
+/* 可拖动：标题行是把手（鼠标与触屏共用 pointer 事件），拖动时整块面板跟手走。 */
+.devext-panel__head { cursor: grab; touch-action: none; user-select: none; }
+.devext-panel.is-dragging { opacity: 0.92; }
+.devext-panel.is-dragging .devext-panel__head { cursor: grabbing; }

@@ -740,7 +740,7 @@ export class Lobby {  /**
    *   plugins", "Gameplay plugins"); hosts: the match hosts a room with gameplay plugins runs its match in
    *   (server/match/host/index.js; none: such a match runs here, unit tests)
    */
-  constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null, options = {}, workshop = null, records = null }) {
+  constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, content = null, plugins = null, hosts = null, options = {}, workshop = null, records = null, accounts = null }) {
     this.registry = registry;
     /** the vanilla content set every room plays (header "Content identity"), or null */
     this.vanilla = content && isContentHash(content.cs) ? Object.freeze({ cs: content.cs, vanilla: true, plugins: Object.freeze([]) }) : null;
@@ -768,6 +768,12 @@ export class Lobby {  /**
      * @type {import('./matchRecords.js').MatchRecords | null}
      */
     this.records = records;
+    /**
+     * 账号画像（`SP_ACCOUNTS=1`, server/accounts.js）：DLC 组合与危机合约词条**跟随账号**（换设备也跟随）。
+     * `null`（默认，也是没有 `SP_ACCOUNTS` 时的唯一取值）⇒ 这两条记忆全部关闭，建房与开关行为与从前逐字节相同。
+     * @type {import('./accounts.js').AccountStore | null}
+     */
+    this.accounts = accounts;
     /**
      * 工坊行为层 (docs/WORKSHOP.md §4): `{ kits, modules }` from server/workshop.js loadWorkshopKits — the per-battle
      * kit map (server-run battles) and the JSON-safe module list a client-simulated battle needs. null for a plain
@@ -1344,7 +1350,8 @@ export class Lobby {  /**
    *
    * 四道判据，全部落在「不认识的请求要响亮」那条线上，没有一道是静默丢弃：
    *   1. 必须**在房间里**（`ERR.NOT_IN_ROOM`）；
-   *   2. **旁观者不可发言**（`ERR.SPECTATOR`）—— 他们收得到每一条，但说不出话，与既有的 `g.*` 同一条口径；
+   *   2. **旁观者也能发言**（owner 要求）—— 他们照旧收得到每一条，现在也能说；只是没有座位号，
+   *      `chat.msg` 的 `seat` 记 `null`，客户端据此只显示名字；
    *   3. 房间的 `chatMode` 允许打字（`ERR.CHAT_MODE`）：`'quick'` 只许快捷短语，`'off'` 全禁；
    *   4. 每会话令牌桶限流（`ERR.RATE`）。
    *
@@ -1358,9 +1365,8 @@ export class Lobby {  /**
   chat(session, msg) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
-    if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     if (room.chatMode !== 'open') return fail(ERR.CHAT_MODE, `this room only allows ${room.chatMode === 'quick' ? 'quick messages' : 'no chat'}`);
-    const seat = room.seatOf(session.playerId);
+    const seat = this.speakerOf(room, session);
     if (!seat) return fail(ERR.NOT_IN_ROOM);
     if (!this.chatAllowed(session, 'chat')) return fail(ERR.RATE);
     const text = chatText(msg.text);
@@ -1376,7 +1382,7 @@ export class Lobby {  /**
    * 任何字符串都能当 id 送进来，接收端就得对着一堆不认识的 id 猜。所以 `this.quickPhrases` 是唯一真源：
    * 未声明的 id 点名拒绝（`ERR.BAD_MSG`）。
    *
-   * 与打字聊天共用同一套房间判据（在房间 / 不是旁观者 / 限流），但**模式判据不同**：`'quick'` 模式放行的正是
+   * 与打字聊天共用同一套房间判据（在房间 / 限流，旁观者一样可以发），但**模式判据不同**：`'quick'` 模式放行的正是
    * 这一条，`'off'` 才一起禁掉。
    * @param {import('./net.js').Session} session
    * @param {{ ids: string, arg?: string }} msg
@@ -1384,9 +1390,8 @@ export class Lobby {  /**
   quickMsg(session, msg) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
-    if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     if (room.chatMode === 'off') return fail(ERR.CHAT_MODE, 'chat is off in this room');
-    const seat = room.seatOf(session.playerId);
+    const seat = this.speakerOf(room, session);
     if (!seat) return fail(ERR.NOT_IN_ROOM);
     for (const id of String(msg.ids).split(',')) {
       if (!this.quickPhrases.has(id)) return fail(ERR.BAD_MSG, `unknown quick phrase "${id.slice(0, 32)}"`);
@@ -1399,9 +1404,23 @@ export class Lobby {  /**
     return OK;
   }
 
+  /**
+   * 房内**发言者**的统一身份（打字与快捷短语共用）。座位玩家返回座位记录；**观战者**返回一份
+   * `{ playerId, name, seat: null }` —— 观战可以发言（owner 要求），但没有座位号。
+   * @param {Room} room
+   * @param {import('./net.js').Session} session
+   */
+  speakerOf(room, session) {
+    const seat = room.seatOf(session.playerId);
+    if (seat) return seat;
+    const spect = room.spectatorOf(session.playerId);
+    if (!spect) return null;
+    return { playerId: spect.playerId, name: spect.name, seat: null };
+  }
+
   /** 房内说话的**唯一出口**（打字与短语共用）：塑形 → 进环形缓冲（重连回放用）→ 广播。 */
   sayInRoom(room, seat, payload) {
-    const out = { t: 'chat.msg', from: seat.playerId, name: seat.name, seat: seat.seat, at: this.now(), ...payload };
+    const out = { t: 'chat.msg', from: seat.playerId, name: seat.name, seat: seat.seat ?? null, at: this.now(), ...payload };
     room.addChat(out);
     this.broadcastRoom(room, out);
     return out;
@@ -1523,7 +1542,11 @@ export class Lobby {  /**
     const installed = catalogue.map((pack) => pack.id);
     const dlcAvailable = selectableDlcIds(installed).filter((id) => id !== 'dossoles' || installed.includes('side-story'));
     const dlcManaged = baseIds.length > 0 && dlcAvailable.length > 0;
-    const resolved = resolveRoomModSet(dlcManaged ? baseIds : [], catalogue);
+    // 开发者模式（dev-ext 的「全量模拟」，以及本服管理员账号）：这一间要能测**全部**内容，
+    // 所以集合 = 全部已装包（含 6 个 DLC 包）；否则 roomAssets 物化出来的是 7 个基础包的 112 席数据面。
+    // 普通 coop / solo 房照旧只声明基础包。
+    const devOn = dev === true && mode === 'solo';
+    const resolved = resolveRoomModSet(devOn ? installed : (dlcManaged ? baseIds : []), catalogue);
     if (!resolved.ok) {
       const unknown = resolved.unknown.length ? resolved.unknown.join(', ') : '(none)';
       const available = resolved.available.length ? resolved.available.join(', ') : '(none)';
@@ -1565,15 +1588,14 @@ export class Lobby {  /**
     // `isLocalIp` —— 与 `?traffic=1` 同一处口径）。上传到公网服务器时，从外部连进来的会话在握手那一刻就拿到
     // `local=false`，于是**点名拒绝**：这是那道真正的闸 —— 客户端的那两处 UI 也按 `welcome.devAllowed` 自动隐藏，
     // 但界面藏起来从来只是「看不见」，拒绝在这里。删掉这段会退回「谁都能开一局全量模拟」。
-    if (dev === true && session.local !== true) {
-      return fail(ERR.BAD_MSG, 'developer mode is only available from a local (loopback / private network) client');
+    if (dev === true && session.local !== true && session.accountRole !== 'admin') {
+      return fail(ERR.BAD_MSG, 'developer mode is only available from a local (loopback / private network) client or an admin account');
     }
     // 重构模拟（模式扩展-重构模拟，mode 'recon'）同一条本地闸：本地实验模式，客户端入口按 `welcome.devAllowed`
     // 隐藏，但「看不见」不是拒绝 —— 公网服务器上构造出来的 `room.create` 在这里被点名挡下。
     if (mode === 'recon' && session.local !== true) {
       return fail(ERR.BAD_MSG, 'recon simulation is only available from a local (loopback / private network) client');
     }
-    const devOn = dev === true && mode === 'solo';
     let devStage = null;
     if (devOn && stage != null) {
       const data = this.safeData();
@@ -1621,6 +1643,9 @@ export class Lobby {  /**
     session.notice = null;
     session.pendingResult = null;
     this.log.info(`[lobby] ${code} created (${mode}/${difficulty}${room.test ? ', test' : ''}) by ${session.name}`);
+    // 房主上一局的 DLC 组合与危机合约词条从账号画像套回（走既有的 setRoomDlc / setContracts 全链校验 + 广播），
+    // 必须在第一次 broadcastState **之前**跑完，这样客户端收到的第一帧就是「已经套好」的房间。
+    this.restoreAccountPrefs(session, room);
     this.broadcastState(room);
     // 房间级钩子（§28.20）：房间**已经完全建好**（`rooms` 里有它、房主就位、集合已物化）之后才触发 —— 钩子看到的
     // 就是这个房间真正的样子。装不上的包在 `install` 里已经点名并退场，房间照旧。
@@ -2055,6 +2080,7 @@ export class Lobby {  /**
     if (next.join(',') === room.contracts.join(',')) return OK;
     this.dropReplay(room, session.playerId);
     room.contracts = next;
+    this.rememberPrefs(session, { contracts: next });
     for (const seat of room.seats) if (seat && !seat.isBot && seat.playerId !== room.hostId) seat.ready = false;
     this.broadcastState(room);
     return OK;
@@ -2088,6 +2114,7 @@ export class Lobby {  /**
     for (const seat of room.seats) if (seat && !seat.isBot && seat.playerId !== room.hostId) { seat.ready = false; seat.modConsent = null; }
     const host = room.seatOf(room.hostId);
     if (host) host.modConsent = room.modSet.digest;
+    this.rememberPrefs(session, { dlc: nextDlc });
     this.log.info(`[lobby] ${room.code} DLC ${id} ${on ? 'enabled' : 'disabled'} by ${session.name}`);
     this.broadcastState(room);
     return OK;
@@ -2557,8 +2584,23 @@ export class Lobby {  /**
     // checked against the room's own data: a room with gameplay plugins knows its plugins' operators (header "Gameplay plugins")
     // the ROOM's data, not the process singleton: the match re-checks the same entries against the same object
     const data = this.dataFor(room);
-    const res = checkLoadout(entries, (id) => lookup('chess', id, data));
-    if (!res || res.error) return fail(res && isErrCode(res.error) ? res.error : ERR.BAD_MSG, res && res.detail);
+    let res = checkLoadout(entries, (id) => lookup('chess', id, data));
+    let dropped = null;
+    if (!res || res.error) {
+      // 2026-10-25 修复（与 server/match/player/basics.js setLoadout 同一口径）：「一条不合就整份拒绝」会让
+      // 本房内容面里没有的陈旧条目（例如上一局 DLC 房的干员）清掉整份调配，对局就按默认技能开局。
+      // 现在逐条独立校验：丢掉的只告诉玩家，合法的照存。
+      const keep = {};
+      dropped = [];
+      for (const [id, e] of Object.entries(entries && typeof entries === 'object' ? entries : {})) {
+        const one = checkLoadout({ [id]: e }, (cid) => lookup('chess', cid, data));
+        if (one && !one.error && one.loadout[id]) keep[id] = one.loadout[id];
+        else dropped.push(id);
+      }
+      if (!Object.keys(keep).length) return fail(res && isErrCode(res.error) ? res.error : ERR.BAD_MSG, res && res.detail);
+      this.log.warn?.(`[lobby] ${room ? room.code : '-'} loadout of ${session.playerId} partially dropped (${res && res.detail}): ${dropped.join(', ') || '-'}`);
+      res = { ok: true, loadout: keep };
+    }
     const ids = opsCharIds(data);
     const resOps = checkLoadoutOps(ops, (id) => ids.has(id), (id) => charPotentialChanges(data, id));
     if (!resOps || resOps.error) return fail(resOps && isErrCode(resOps.error) ? resOps.error : ERR.BAD_MSG, resOps && resOps.detail);
@@ -2568,10 +2610,11 @@ export class Lobby {  /**
     session.loadout = loadout;
     session.ops = opsSet;
     session.loadoutCs = cs;
-    if (!room) return OK;
+    const accept = dropped && dropped.length ? Object.freeze({ ok: true, dropped: Object.freeze(dropped.slice()) }) : OK;
+    if (!room) return accept;
     const seat = room.seatOf(session.playerId);
     if (seat) { seat.loadout = loadout; seat.ops = opsSet; seat.loadoutCs = cs; }
-    if (!room.match || !seat) return OK; // a spectator's loadout stays on its session, never reaching the match
+    if (!room.match || !seat) return accept; // a spectator's loadout stays on its session, never reaching the match
     if (typeof room.match.setLoadout !== 'function') return fail(ERR.ROOM_STARTED, 'stored for the next match');
     let r;
     try {
@@ -2584,8 +2627,11 @@ export class Lobby {  /**
       return fail(ERR.INTERNAL);
     }
     // a match in a match host answers later (header "Gameplay plugins")
-    if (r && typeof r.then === 'function') return Promise.resolve(r).then(matchAnswer, () => fail(ERR.INTERNAL));
-    return matchAnswer(r);
+    if (r && typeof r.then === 'function') {
+      return Promise.resolve(r).then((ans) => (ans && ans.error ? matchAnswer(ans) : accept), () => fail(ERR.INTERNAL));
+    }
+    const ans = matchAnswer(r);
+    return ans.ok ? accept : ans;
   }
 
   /**
@@ -2835,7 +2881,18 @@ export class Lobby {  /**
     if (s.skins && typeof s.skins === 'object') {
       const ids = operatorCharIds(data);
       const res = checkSkinSelection(s.skins, (id) => ids.has(id));
-      if (res.ok) skins = Object.freeze({ ...res.skins });
+      if (res.ok) {
+        skins = Object.freeze({ ...res.skins });
+        // 2026-10-25：皮肤本来就逐条过滤，此前却没有任何痕迹 —— 玩家报「皮肤变默认」时无从对号。
+        const kept = Object.keys(skins).length;
+        const total = Object.keys(s.skins).length;
+        if (kept < total) {
+          const lost = Object.keys(s.skins).filter((id) => !Object.hasOwn(skins, id));
+          this.log.warn?.(`[lobby] ${room.code} skins of ${s.playerId}: dropped ${total - kept}/${total} (${lost.join(', ')})`);
+        }
+      } else {
+        this.log.warn?.(`[lobby] ${room.code} skins of ${s.playerId} ignored: ${(res && res.detail) || 'malformed'}`);
+      }
     }
     return { loadout, ops, notOwned, diy, skins };
   }
@@ -2869,6 +2926,61 @@ export class Lobby {  /**
    * Since the 0.3.0 merge it also carries the server's content identity (`content: { vanilla: <cs>, plugins?: n }`, the
    * header "Content identity"): **absent** when the Lobby was given no `content` option, so a server without a content
    * identity sends exactly what it sent before. */
+  /**
+   * 把房间偏好写进账号画像（只覆盖传进来的键）。写失败只记一行日志 —— 一份个人偏好不该让操作本身失败。
+   * @param {object} session
+   * @param {{ dlc?: string[], contracts?: string[] }} patch
+   */
+  rememberPrefs(session, patch) {
+    const store = this.accounts;
+    if (!store || typeof store.setProfile !== 'function' || !session || typeof session.name !== 'string' || !session.name) return;
+    try {
+      store.setProfile(session.name, patch);
+    } catch (e) {
+      this.log.warn('[lobby] account profile write failed', e);
+    }
+  }
+
+  /**
+   * 新房建好后，把房主账号画像里的 DLC 组合与危机合约词条套回这一局。
+   *
+   * 走的是**既有的** setRoomDlc / setContracts：本服没装那个包、难度不够、包带房间钩子等拒绝条件
+   * 与手动开关逐条相同，被拒就只记一行 info（绝不抛），所以「套回偏好」不可能让建房失败。
+   * @param {object} session
+   * @param {object} room
+   */
+  restoreAccountPrefs(session, room) {
+    const store = this.accounts;
+    if (!store || typeof store.getProfile !== 'function' || !session || typeof session.name !== 'string' || !session.name) return;
+    let profile = null;
+    try {
+      profile = store.getProfile(session.name);
+    } catch (e) {
+      this.log.warn('[lobby] account profile read failed', e);
+      return;
+    }
+    if (!profile || typeof profile !== 'object') return;
+    if (Array.isArray(profile.dlc)) {
+      for (const id of profile.dlc) {
+        if (typeof id !== 'string') continue;
+        try {
+          const res = this.setRoomDlc(session, { id, on: true });
+          if (res && res.ok !== true) this.log.info(`[lobby] ${room.code} account DLC ${id} not restored: ${res.error || 'refused'}`);
+        } catch (e) {
+          this.log.warn('[lobby] account DLC restore crashed', e);
+        }
+      }
+    }
+    if (Array.isArray(profile.contracts) && profile.contracts.length) {
+      try {
+        const res = this.setContracts(session, { contracts: profile.contracts });
+        if (res && res.ok !== true) this.log.info(`[lobby] ${room.code} account contracts not restored: ${res.error || 'refused'}`);
+      } catch (e) {
+        this.log.warn('[lobby] account contracts restore crashed', e);
+      }
+    }
+  }
+
   welcomeInfo(session = null) {
     const panels = this.workshop && Array.isArray(this.workshop.panels) ? this.workshop.panels : [];
     const assets = this.workshop && Array.isArray(this.workshop.assets) ? this.workshop.assets : [];
@@ -2908,7 +3020,7 @@ export class Lobby {  /**
       // （`session.local`，即对端地址是回环 / 私网；见 server/net.js 与 create 里那道真正的闸）。非本地端——
       // 也就是任何连到公网服务器的浏览器——**这个键一个字都不出现**，于是客户端把那两处 UI 整块藏掉；反过来，
       // 一份从前那种（不带这个键的）`welcome` 与今天的一次公网握手逐字节相同。
-      ...(session && session.local === true ? { devAllowed: true } : {}),
+      ...(session && (session.local === true || session.accountRole === 'admin') ? { devAllowed: true } : {}),
       ...(this.modSet ? { mods: this.modSet } : {}),
       ...(panels.length ? { modPanels: panels } : {}),
       ...(assets.length ? { modAssets: assets } : {}),

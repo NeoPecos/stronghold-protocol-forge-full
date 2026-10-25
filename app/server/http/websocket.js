@@ -160,6 +160,8 @@ export function createSessionStack(opts, { data, log, content = null, plugins = 
     registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, content, plugins, hosts, options: lobbyOptions,
     // 对局战绩（docs/RECORDS.md §3）：null = 没有 SP_ACCOUNTS ⇒ 结算点不落盘。
     records: opts.records || null,
+    // 账号画像（`SP_ACCOUNTS=1`）：DLC 组合与危机合约词条跟随账号，建房时由大厅套回。
+    accounts: accounts || null,
     // 创意工坊 (docs/WORKSHOP.md): the behaviour layer of the installed packs travels with every match this lobby starts
     workshop: opts.workshop,
   });

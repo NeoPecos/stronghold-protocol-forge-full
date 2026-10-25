@@ -21,9 +21,15 @@
 .dlc-card button i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: #fff; transition: transform .16s; }
 .dlc-card.is-on button i { background: #31c69c; }
 .dlc-card.is-on button i::after { transform: translateX(17px); }
-.dlc-page__consent,.rs-dlc-entry { padding: 9px 13px; border: 1px solid #40cba5; background: #15382e; color: #d8fff2; cursor: pointer; }
-.rs-dlc-entry { font-size: 13px; }
-.rs-dlc-entry--compact { display: none; min-width: 42px; padding: 7px 9px; }
+.dlc-page__consent { padding: 9px 13px; border: 1px solid #40cba5; background: #15382e; color: #d8fff2; cursor: pointer; }
+.rs-dlc-entry {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: .36rem; min-width: .36rem; padding: 0 .14rem;
+  border: 1px solid #40cba5; background: #15382e; color: #d8fff2; cursor: pointer;
+  font-size: calc(.15 * var(--t)); font-weight: 700; letter-spacing: .06em; line-height: 1;
+  white-space: nowrap;
+}
+.rs-dlc-entry--compact { display: none; min-width: .36rem; padding: 0 .1rem; font-size: calc(.14 * var(--t)); }
 .hub-recruit__dlc,.mm-room-dlc { padding: 2px 5px; border: 1px solid #e8ad62; color: #ffcf8c; font-size: 11px; white-space: nowrap; }
 .dlc-detail { position: fixed; inset: 0; z-index: 1; overflow: auto; background: #0c1614; font-size: 15px; }
 .dlc-detail header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid #31554d; background: #14201e; }

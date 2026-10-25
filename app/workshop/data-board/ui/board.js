@@ -59,7 +59,7 @@
 // 已含这一位自己吃到的盟约 / 天赋 / 装备 / 正在跑的技能）用它，休整期没有在演的战斗时退回纸面模型并标注。
 
 import { h, Fragment, render } from 'preact';
-import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 // 官方战斗读数：浏览器本地战斗结束的结果由引擎的战斗运行器派发（`screens/game.js` 订阅的是同一个 `result` 事件）。
 // 面板模块可以直接 import 引擎的**站点模块**（docs/WORKSHOP.md「你的面板模块可以直接 import 引擎的流程」，那里给的
@@ -1753,6 +1753,8 @@ function DevStats({ pid, row, units }) {
 function Panel({ pid }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('units');
+  // 面板根节点：点空白关闭要判断落点是否在本面板里（收起态 / 展开态共用这一个 ref）。
+  const boxRef = useRef(null);
 
   // 收起 / 展开会改变面板高度与锚点（收起态垂直居中于该行、展开态与该行顶对齐），所以每次重画后重新贴一次。
   // 这里必须用 useLayoutEffect 而不是 useEffect：前者在 DOM 改完、浏览器绘制之前**同步**触发（后者的回调被
@@ -1761,6 +1763,20 @@ function Panel({ pid }) {
   // 再看到它跳到正确位置 —— 那就是「点开时闪一下」。改用布局副作用后，重贴坐标的 rAF 一定赶在下一帧绘制前执行，
   // 展开的那一帧永远不会以旧锚点被画出来。
   useLayoutEffect(() => { requestLayout(); });
+
+  // 点空白关闭（维护者 2026-10-25）：展开时在 document 捕获阶段挂一层监听，落点不在本面板里就收起。
+  // 捕获阶段是因为面板里有些子控件会 stopPropagation；收起态没有监听，所以点别的面板的「数据统计」不受影响。
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      const box = boxRef.current;
+      const t = e.target;
+      if (!box || !t || typeof box.contains !== 'function' || box.contains(t)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, [open]);
 
   const { pub, priv, myId } = feed;
   const players = Array.isArray(pub && pub.players) ? pub.players : [];
@@ -1813,7 +1829,7 @@ function Panel({ pid }) {
       : (Array.isArray(unite.helpers) && unite.helpers.includes(pid) ? '协防方（迎战）' : '—'));
 
   if (!open) {
-    return html`<div class=${cx(CLS, 'is-collapsed')}>
+    return html`<div class=${cx(CLS, 'is-collapsed')} ref=${boxRef}>
       <button type="button" class=${`${CLS}__tab`} aria-expanded="false" title="展开数据统计"
         onClick=${() => setOpen(true)}>
         <span class=${`${CLS}__tab-label`}>数据统计</span>
@@ -1836,7 +1852,7 @@ function Panel({ pid }) {
   // 「全量测试统计」页行更宽（盟约来源 / 增益清单），所以它也加宽（`is-dev`，见 board.css）。
   const isDevTab = activeTab === 'dev';
 
-  return html`<section class=${cx(CLS, 'is-open', isUnits && 'is-units', isDevTab && 'is-dev')} aria-label="数据统计">
+  return html`<section class=${cx(CLS, 'is-open', isUnits && 'is-units', isDevTab && 'is-dev')} ref=${boxRef} aria-label="数据统计">
     <header class=${`${CLS}__head`}>
       <span class=${`${CLS}__title`}>数据统计</span>
       ${row ? html`<span class=${`${CLS}__who`}>${row.name || '博士'}</span>` : null}

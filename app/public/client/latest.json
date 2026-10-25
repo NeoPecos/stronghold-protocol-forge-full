@@ -1,17 +1,35 @@
 {
   "schema": 1,
   "android": {
-    "versionCode": 1,
-    "version": "1.0.0",
-    "notes": "5服首个客户端版本：内置全量素材与 0.3.1 内核，支持内置更新器、服务器切换、重新连接与 F11 全屏。",
+    "versionCode": 3,
+    "version": "1.0.2",
+    "notes": "修复连接重置的兼容连接、地图素材请求及素材索引读取。旧版若无法获取更新清单，请手动覆盖安装一次。",
     "page": "https://sp5.bs.leio.fun/client/",
-    "patches": []
+    "apkSha256": "ba2365e4e146f55aef98056e8fac68626ec57e30d7034ccdb07368997294e584",
+    "patches": [
+      {
+        "baseSha256": "eb267d57dc7843811105597f5d5a5434ffdb37a692db9e16518c6c1288bdc361",
+        "url": "https://sp5.bs.leio.fun/client/patches/5sp-android-1.0.0-to-1.0.2.patch.gz",
+        "sha256": "a1a2d3e9e2288dfe9ab1248ea9587d18a81e0a7410a4c6563c980cf36a9340ef"
+      }
+    ]
   },
   "windows": {
-    "versionCode": 1,
-    "version": "1.0.0",
-    "notes": "5服首个客户端版本：内置全量素材与 0.3.1 内核，支持内置更新器、服务器切换、重新连接与 F11 全屏。",
+    "versionCode": 15,
+    "version": "1.0.2",
+    "notes": "修复地图贴图加载失败。1.0.0首次更新先安装约119KB的更新器兼容补丁，重开后再点检查更新，安装约51MB的1.0.2完整修复补丁；共两步。",
     "page": "https://sp5.bs.leio.fun/client/",
-    "patches": []
+    "patches": [
+      {
+        "from": 13,
+        "url": "https://sp5.bs.leio.fun/client/patches/5sp-windows-updater-1.0.0-to-1.0.1.zip",
+        "sha256": "5da58c311c83b7d996d8ef2d6a8b21102ef4fbc7539d5eb33832d3ebc609a165"
+      },
+      {
+        "from": 14,
+        "url": "https://sp5.bs.leio.fun/client/patches/5sp-windows-1.0.1-to-1.0.2.zip",
+        "sha256": "2e9d5904ae7f98f164975b4e402ac0805c6b3841f58b4832654a15bb203f11eb"
+      }
+    ]
   }
 }

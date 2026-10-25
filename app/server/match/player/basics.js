@@ -96,10 +96,22 @@ export class PlayerBasics {
         if (Object.keys(x).length) entries[id] = x;
       }
     }
-    const res = checkLoadout(entries, (id) => this.gd.chess(id));
+    let res = checkLoadout(entries, (id) => this.gd.chess(id));
     if (!res || !res.ok) {
-      this.m.log?.warn?.(`[match ${this.m.roomCode}] loadout of ${this.playerId} ignored: ${res && res.detail}`);
-      return false;
+      // 2026-10-25 修复：一条不合不再整份丢弃。旧行为是一票否决 —— 玩家上一局留给某个 DLC 干员的调配，
+      // 在本局内容面里不存在时，整份 loadout 被打回、对局按默认值开局，于是「技能/模组莫名变默认」。
+      // 现在逐条独立校验：本局数据不认识的条目只丢它自己，其余照常生效，并把丢了哪些写进日志。
+      const keep = {};
+      const dropped = [];
+      for (const [id, e] of Object.entries(entries)) {
+        const one = checkLoadout({ [id]: e }, (cid) => this.gd.chess(cid));
+        if (one && one.ok) Object.assign(keep, one.loadout);
+        else dropped.push(id);
+      }
+      this.m.log?.warn?.(`[match ${this.m.roomCode}] loadout of ${this.playerId} partially dropped (${res && res.detail}): ${dropped.join(', ') || '-'}`);
+      // 一条都不合法：保持旧行为（什么都不改），免得把玩家已有的选择静默清空
+      if (!Object.keys(keep).length && Object.keys(entries).length) return false;
+      res = { ok: true, loadout: keep };
     }
     // [ASSUMED] prep merges ops the same way, so a partial panel does not wipe the operators it does not name.
     const merge = !!(opts && opts.merge);

@@ -474,8 +474,8 @@
    所以 .chatp 的 absolute 直接锚在房间屏上；不要再给 .rs 写 position（会盖掉 .screen 的 absolute）。 */
 .rs .chatp {
   position: absolute;
-  left: max(.18rem, 12px);
-  bottom: max(.92rem, 60px);
+  left: .18rem;
+  bottom: .92rem;
   width: min(4.4rem, 30vw);
   z-index: 7;
   border-color: rgba(255, 255, 255, .16);
@@ -495,6 +495,92 @@
 .rs .chatp .chatp__q { flex: none; font-size: calc(.12 * var(--t)); padding: .02rem .08rem; }
 .rs .chatp .chatp__input { font-size: calc(.14 * var(--t)); }
 .rs .chatp .chatp__go { font-size: calc(.13 * var(--t)); }
+/* 收起/展开（chat.js 的 chatp__fold）：收起后只剩标题行、宽度回到内容宽；未读数直接写在按钮上。 */
+.rs .chatp .chatp__fold {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: .26rem; height: .26rem; padding: 0 .07rem;
+  font: inherit; font-size: calc(.15 * var(--t)); line-height: 1; cursor: pointer;
+  color: var(--text-md); background: transparent;
+  border: 1px solid var(--line-2); border-radius: .05rem;
+  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.rs .chatp .chatp__fold:hover { color: var(--mint-400); border-color: var(--mint-600); }
+.rs .chatp .chatp__fold.is-unread { color: var(--mint-400); border-color: var(--mint-600); }
+.rs .chatp.is-collapsed { width: auto; }
+.rs .chatp.is-collapsed .panel__body { display: none; }
+.rs .chatp.is-collapsed .panel__titles .micro { display: none; }
 @media (max-width: 900px) {
   .rs .chatp { width: min(5.4rem, 56vw); }
 }
+
+/* ---- 房内聊天窗口：可拖动、可放大（2026-10-25；结构见 public/js/screens/chat.js 的 .chatp-dock） ----------------
+   整块位置/尺寸由 chat.js 以 px 写到 .chatp-dock 上（相对 .rs 的 rect）；宽度/高度走 CSS 变量：
+   没拖过 = 原来的左下角小窗；拖过 = --chatp-w/--chatp-h 定住；收起 = 回到内容宽（只剩标题行）。 */
+.rs .chatp-dock {
+  position: absolute;
+  left: .18rem;
+  bottom: .92rem;
+  width: var(--chatp-w, min(4.4rem, 30vw));
+  z-index: 7;
+}
+.rs .chatp-dock.is-sized:not(.is-folded) { height: var(--chatp-h, auto); }
+.rs .chatp-dock.is-folded { width: auto; height: auto; }
+/* 面板本身不再自己定位：铺满 dock（.rs .chatp 的配色/边框/背板样式照旧生效） */
+.rs .chatp-dock > .chatp { position: relative; left: auto; bottom: auto; width: 100%; height: 100%; }
+.rs .chatp-dock.is-folded > .chatp { width: auto; height: auto; }
+/* 标题行即拖拽把手（按钮/输入框/宿主机位不抢事件，JS 里跳过） */
+.rs .chatp-dock > .chatp .panel__head { cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+.rs .chatp-dock.is-dragging > .chatp .panel__head { cursor: grabbing; }
+/* 放大后让消息列表吃掉多出来的高度；默认仍保留 room.css 的 1.3rem 上限 */
+.rs .chatp-dock > .chatp .panel__body { display: flex; flex-direction: column; min-height: 0; }
+.rs .chatp-dock.is-folded > .chatp .panel__body { display: none; }
+.rs .chatp-dock.is-sized > .chatp .chatp__list { flex: 1 1 auto; min-height: 0; max-height: none; }
+/* 右下角拖拽放大：只压住边框这一角，不挡发送按钮中心 */
+.rs .chatp__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  z-index: 3;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.rs .chatp__resize::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid rgba(255, 255, 255, .42);
+  border-bottom: 2px solid rgba(255, 255, 255, .42);
+  border-radius: 0 0 2px 0;
+}
+.rs .chatp-dock.is-folded .chatp__resize { display: none; }
+/* 弹幕开关（chat.js 的 chatp__danmaku）：与收起键同款小按钮，开启时亮薄荷色 */
+.rs .chatp .chatp__danmaku {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: .26rem;
+  height: .26rem;
+  padding: 0 .07rem;
+  font: inherit;
+  font-size: calc(.13 * var(--t));
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-md);
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: .05rem;
+  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.rs .chatp .chatp__danmaku:hover,
+.rs .chatp .chatp__danmaku.is-on { color: var(--mint-400); border-color: var(--mint-600); }
+@media (max-width: 900px) {
+  .rs .chatp-dock { width: var(--chatp-w, min(5.4rem, 56vw)); }
+}
+
+/* 右下角放大手柄压住边框一角：发送行右侧让出这一角，避免点「发送」时误拖 */
+.rs .chatp-dock > .chatp .chatp__send { padding-right: 24px; }

@@ -89,86 +89,31 @@ const dlcPlain = (value) => value == null ? '—'
   : Object.keys(value).length
     ? Object.entries(value).map(([key, inner]) => `${key}: ${dlcPlain(inner)}`).join('，')
     : '—';
-const dlcFinalText = (path, value) => {
-  const root = String(path).split('.')[0];
-  if (root === 'bonds') return Array.isArray(value) ? (value.length ? value.map(dlcBondName).join('、') : '无') : dlcPlain(value);
-  if (root === 'members' || root === 'visibleMembers') return Array.isArray(value) ? `${value.length} 人` : dlcPlain(value);
-  return dlcPlain(value);
-};
-const dlcChangeText = (field) => {
-  const root = String(field.path || '').split('.')[0];
-  const label = dlcFieldName(root);
-  const before = field.before;
-  const after = field.after;
-  if (root === 'members' || root === 'visibleMembers') {
-    if (Array.isArray(before) || Array.isArray(after)) {
-      const b = Array.isArray(before) ? before : [];
-      const a = Array.isArray(after) ? after : [];
-      const added = a.filter((id) => !b.includes(id));
-      const removed = b.filter((id) => !a.includes(id));
-      const bits = [`${b.length} 人 → ${a.length} 人`];
-      if (added.length) bits.push(`新增 ${added.map(dlcChessName).join('、')}`);
-      if (removed.length) bits.push(`移除 ${removed.map(dlcChessName).join('、')}`);
-      return `${label}：${bits.join('，')}`;
-    }
-    if (after != null && before == null) return `${label}：新增 ${dlcChessName(String(after))}`;
-    if (before != null && after == null) return `${label}：移除 ${dlcChessName(String(before))}`;
-    return `${label}：${dlcPlain(before)} → ${dlcPlain(after)}`;
-  }
-  if (root === 'bonds') {
-    const b = Array.isArray(before) ? before.map(dlcBondName) : [];
-    const a = Array.isArray(after) ? after.map(dlcBondName) : [];
-    const added = a.filter((name) => !b.includes(name));
-    const removed = b.filter((name) => !a.includes(name));
-    let line = `${label}：${b.length ? b.join('、') : '无'} → ${a.length ? a.join('、') : '无'}`;
-    if (added.length) line += `（新增 ${added.join('、')}）`;
-    if (removed.length) line += `（移除 ${removed.join('、')}）`;
-    return line;
-  }
-  return `${label}：${dlcPlain(before)} → ${dlcPlain(after)}`;
-};
-const dlcValueAt = (record, path) => path.split('.').reduce((value, part) => {
-  if (Array.isArray(value)) return value[Number(part) - 1];
-  return value?.[part];
-}, record);
 
 function DlcCompare({ chess, golden, preview, roomDlc }) {
   if (!preview) return html`<p class="lo-dlc__empty">${t('DLC 对比资料暂不可用')}</p>`;
   const ids = dlcEntries(preview, chess, golden);
   if (!ids.length) return html`<p class="lo-dlc__empty">${t('此干员没有已安装 DLC 的改动')}</p>`;
   return html`<section class="lo-dlc">
-    <p class="lo-dlc__intro">${t('下面写的是这个干员被改动的具体内容；是否生效看房间的 DLC 开关。')}</p>
+    <p class="lo-dlc__intro">${t('下面写的是这些 DLC 带来的战斗内容；是否生效看房间的 DLC 开关。')}</p>
     ${ids.map((id) => {
       const pack = DLC_PACKS.find((entry) => entry.id === id);
       const records = [
-        ...(preview.byChess?.[chess?.chessId] || []).filter((entry) => entry.pack === id).map((entry) => ({ ...entry, form: t('普通'), current: chess })),
-        ...(preview.byChess?.[golden?.chessId] || []).filter((entry) => entry.pack === id).map((entry) => ({ ...entry, form: t('精锐'), current: golden })),
+        ...(preview.byChess?.[chess?.chessId] || []).filter((entry) => entry.pack === id),
+        ...(preview.byChess?.[golden?.chessId] || []).filter((entry) => entry.pack === id),
       ];
       return html`<article class="lo-dlc__pack" key=${id}>
         <header><h3>${dlcName(id)}</h3><span class=${cx('lo-dlc__state', roomDlc && !roomDlc.includes(id) && 'is-off')}>
           ${roomDlc ? roomDlc.includes(id) ? t('本房已启用') : t('本房未启用') : t('大厅预览')}</span></header>
-        ${records.map((record) => {
-          const lines = record.fields.map((field) => {
-            const finalValue = roomDlc
-              ? dlcValueAt(field.bondId ? data.lookup('bonds', field.bondId) : record.current, field.path)
-              : null;
-            return html`<li>
-              <b>${field.bondId ? `${t('盟约')} · ${dlcBondName(field.bondId)} · ` : ''}${dlcChangeText(field)}</b>
-              ${roomDlc ? html`<em>${t('本房最终')}：${dlcFinalText(field.path, finalValue)}</em>` : null}</li>`;
-          });
-          return html`<div class="lo-dlc__form">
-            <h4>${record.form}${record.added ? ` · ${t('DLC 专属干员')}` : ''}</h4>
-            ${record.added ? html`<p>${t('本体没有这个干员；仅在启用此 DLC 的房间中出现。')}</p>` : null}
-            ${lines.length ? html`<ul class="lo-dlc__lines">${lines}</ul>` : null}
-            ${record.kit ? html`<p class="lo-dlc__kit">${t('此 DLC 还替换了该干员的战斗逻辑（技能/模组），不只是上面的字段。')}</p>` : null}
-          </div>`;
-        })}
-        ${pack ? html`<details class="lo-dlc__notes"><summary>${t('查看此 DLC 的战斗内容说明')}</summary>
-          <ul>${pack.contents.map((line) => html`<li>${t(line)}</li>`)}</ul></details>` : null}
+        ${records.some((record) => record.added) ? html`<p class="lo-dlc__kit">${t('DLC 专属干员：本体没有这个干员，仅在启用此 DLC 的房间中出现。')}</p>` : null}
+        ${records.some((record) => record.kit) ? html`<p class="lo-dlc__kit">${t('注：这个 DLC 还替换了该干员的战斗逻辑（技能/模组），不只是数值。')}</p>` : null}
+        ${pack ? html`<section class="lo-dlc__notes"><h4>${t('战斗内容说明')}</h4>
+          <ul>${pack.contents.map((line) => html`<li>${t(line)}</li>`)}</ul></section>` : null}
       </article>`;
     })}
   </section>`;
 }
+
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
 
 // ---- export / import (干员调配 presets) -----------------------------------------------------------------------------
@@ -631,7 +576,7 @@ export function OpCard({ m, chess, golden, entries, ops = {}, selected = false, 
         </span>
       </button>
       <span class="lo-op__meta"><${PotPips} n=${cv.potential} /><span class="lo-op__name">${chess.name}</span></span>
-      ${dlcPacks.length ? html`<span class="lo-dlc__badge">DLC · ${dlcPacks.map(dlcName).join(' / ')}</span>` : null}
+      ${dlcPacks.length ? html`<span class="lo-dlc__badge lo-op__badge" title=${`DLC · ${dlcPacks.map(dlcName).join(' / ')}`}>DLC</span>` : null}
       <span class="lo-op__bonds">${(chess.bonds || []).map((b) => html`<span key=${b} class="lo-op__bond" title=${data.lookup('bonds', b)?.name || b}>
         <${Img} src=${bondIconUrl(m, b)} fallback=${html`<i class="lo-bond__dot"></i>`} /></span>`)}</span>
     </div>

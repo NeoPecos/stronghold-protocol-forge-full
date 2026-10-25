@@ -1,4 +1,7 @@
 {
+  "已套用上次启用的合约（{n} 条 · {pts} 分）": "Applied the contracts enabled last time ({n} · {pts} pts)",
+  "已套用上次启用的 DLC（{n} 项）": "Applied the DLC enabled last time ({n} items)",
+
   "_meta": {
     "type": "lang",
     "lang": "en",

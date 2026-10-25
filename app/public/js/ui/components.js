@@ -800,17 +800,30 @@ export function ResultDialog({ title, sub, micro, tone = 'mint', duration = 2800
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [duration]);
   if (gone) return null;
-  return html`<div class=${cx('rdialog', `rdialog--${tone}`, leaving && 'is-leaving')} role="status" aria-live="polite">
+  return html`<div class=${cx('rdialog', 'rdialog--battle-end', `rdialog--${tone}`, leaving && 'is-leaving')} role="status" aria-live="polite">
     <div class="rdialog__box">
-      <span class="rdialog__tick rdialog__tick--tl"></span><span class="rdialog__tick rdialog__tick--tr"></span>
-      <span class="rdialog__tick rdialog__tick--bl"></span><span class="rdialog__tick rdialog__tick--br"></span>
+      <span class="rdialog__scan" aria-hidden="true"></span>
+      <span class="rdialog__tick rdialog__tick--tl" aria-hidden="true"></span>
+      <span class="rdialog__tick rdialog__tick--tr" aria-hidden="true"></span>
+      <span class="rdialog__tick rdialog__tick--bl" aria-hidden="true"></span>
+      <span class="rdialog__tick rdialog__tick--br" aria-hidden="true"></span>
       ${micro ? html`<span class="rdialog__micro">${micro}</span>` : null}
       <div class="rdialog__row">
-        <${Chevrons} count=${3} tone=${tone} class="rdialog__chev" />
-        <span class="rdialog__title">${title}</span>
-        <${Chevrons} count=${3} tone=${tone} dir="left" class="rdialog__chev" />
+        <span class="rdialog__icon-panel" aria-hidden="true">
+          <span class="rdialog__icon-mark rdialog__icon-mark--tl"></span><span class="rdialog__icon-mark rdialog__icon-mark--tr"></span>
+          <span class="rdialog__icon-mark rdialog__icon-mark--bl"></span><span class="rdialog__icon-mark rdialog__icon-mark--br"></span>
+          <span class="rdialog__icon"><svg viewBox="0 0 180 115" fill="none">
+            <path d="M17 22h55l9 9v55l-9 9H17l-9-9V31z" fill="currentColor"/>
+            <path d="m27 49 12 12-12 12m44-24L59 61l12 12" stroke="#09231d" stroke-width="8" stroke-linecap="square" stroke-linejoin="bevel"/>
+            <path d="M30 79h35l-8 9H38z" fill="#09231d"/>
+            <path d="m111 70 44-53c5-6 14 1 9 7l-44 52" stroke="currentColor" stroke-width="13" stroke-linecap="square"/>
+            <path d="m96 57 30 29M107 73 94 87" stroke="currentColor" stroke-width="12" stroke-linecap="square"/>
+            <path d="M105 13v9m17-15-7 9m-25 4 9 3" stroke="currentColor" stroke-width="5" stroke-linecap="square"/>
+          </svg></span>
+        </span>
+        <span class="rdialog__words"><span class="rdialog__title">${title}</span>
+          ${sub ? html`<span class="rdialog__sub">${sub}</span>` : null}</span>
       </div>
-      ${sub ? html`<span class="rdialog__sub">${sub}</span>` : null}
     </div>
   </div>`;
 }

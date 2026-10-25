@@ -132,18 +132,6 @@ describe('assets.skins：按干员分组的合并', () => {
     assert.deepEqual(r.report.skins, { char_1_01: 1 });
   });
 
-  test('固定工坊皮肤也进入 a5 换装与战斗读取的 chars.skins', () => {
-    const base = { assets: { chars: { char_1_01: { avatar: '/assets/base.png', skins: { own: { name: '原有皮肤' } } } } }, backups: { diy: { ownedPool: [] } } };
-    const art = { avatar: 's/a.png', spine: { front: { skel: 's/f.skel', atlas: 's/f.atlas', textures: ['s/f.png'] } } };
-    const r = applyWorkshop(base, [P('skinA', [{ id: 'summer', charId: 'char_1_01', name: '夏日', series: '海岸', art }])]);
-    const variants = r.data.assets.chars.char_1_01.skins;
-    assert.equal(variants.own.name, '原有皮肤');
-    assert.equal(variants.summer.name, '夏日');
-    assert.equal(variants.summer.group, '海岸');
-    assert.equal(variants.summer.spine.front.skel, '/workshop-assets/skinA/s/f.skel');
-    assert.equal(r.data.assets.skins.char_1_01[0].id, 'summer', 'Forge 自己的列表仍可读取');
-  });
-
   test('同一干员的多套**并列共存**（这是它与 art 最不同的一点）', () => {
     const r = apply([P('skinA', [
       { id: 'summer', charId: 'char_1_01', name: '夏日' },

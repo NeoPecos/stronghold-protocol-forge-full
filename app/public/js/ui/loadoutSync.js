@@ -319,11 +319,16 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
       pendingJson = json;
       setState('sending');
       try {
-        await net.request(msgType, field ? { [field]: payload } : payload);
+        const reply = await net.request(msgType, field ? { [field]: payload } : payload);
         if (my !== seq) return;
         pendingJson = null;
         lastSent = json;
         setState('synced');
+        // 2026-10-25：服务端改成「逐条过滤」后会把丢掉的条目报回来（本房内容面里没有的干员）。
+        // 提示一句，免得玩家以为自己刚调好的东西又被重置了。
+        if (reply && Array.isArray(reply.dropped) && reply.dropped.length) {
+          tell(`本局不包含 ${reply.dropped.length} 个已调配干员，这些设置已跳过，其余已保存`);
+        }
       } catch (err) {
         if (my !== seq) return;
         pendingJson = null;

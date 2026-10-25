@@ -155,3 +155,10 @@
 }
 .community-chat__code:hover { color: #1d1400; background: var(--gold); }
 .community-chat__by { flex: 1 1 100%; font-size: .11rem; color: var(--text-dim); }
+
+/* 2026-10-25 手机横屏：大厅聊天在小 root（≈37.7px）下只有 ~147px 宽，和顶栏被 px 放大的按钮
+   严重不成比例。这里按「宽度取 4.2rem/40vw、高度 3.2rem/58vh」放大一档；zoom 1.35 仍生效，
+   所以实际视觉宽度 ≈ 4.2rem*1.35 ≈ 213px（视口 904px 的 24%）。 */
+@media (max-height: 560px) and (min-aspect-ratio: 4/3) {
+  .community-chat { width: min(4.2rem, 40vw); max-height: min(3.2rem, 58vh); }
+}

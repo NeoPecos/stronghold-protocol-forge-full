@@ -25,7 +25,6 @@ import { AssetImportButton } from '../ui/assetImport.js';
 import { useEffect, useMemo, useState } from '../../vendor/hooks.module.js';
 import { NAME_MAX_LEN, UPSTREAM_VERSION, DEV_BUILD } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel, TextField, PingPill } from '../ui/components.js';
-import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
 import { AnnouncementButton } from '../ui/announcements.js';
 import { toast } from '../ui/toasts.js';
@@ -44,6 +43,23 @@ import { installedCount } from '../content.js';
 import { sanitizeName, isValidName } from '../ui/playerName.js';
 
 export { stripLoneSurrogates, sanitizeName, isValidName } from '../ui/playerName.js';
+
+// 记住账号密码（2026-10-25）：账号登录成功且勾选「记住账号密码」时，把代号与密码留在本机 localStorage
+// （键 sp.remember.cred），下次打开起名页自动回填；取消勾选立即清除。只在本机保存，不上云、不进票据体系
+// （与 identity 的保持登录/30 天票据无关：退出登录不动这里）。
+const REMEMBER_CRED_KEY = 'sp.remember.cred';
+function loadSavedCreds() {
+  try {
+    const json = JSON.parse(localStorage.getItem(REMEMBER_CRED_KEY) || 'null');
+    return json && typeof json.name === 'string' && typeof json.password === 'string' ? json : null;
+  } catch { return null; }
+}
+function saveSavedCreds(next) {
+  try {
+    if (next) localStorage.setItem(REMEMBER_CRED_KEY, JSON.stringify(next));
+    else localStorage.removeItem(REMEMBER_CRED_KEY);
+  } catch { /* 隐私模式/存储配额：记住密码只是便利功能，失败静默 */ }
+}
 
 /**
  * Enter the game shell with a nickname (title → lobby).
@@ -168,7 +184,7 @@ export function TitleScreen() {
   const conn = useStore((s) => s.connection, shallowEqual);
   const pendingJoin = useStore((s) => s.ui.pendingJoin);
   useLang(); // re-render on a language switch
-  const [name, setName] = useState(() => store.get().me.name || identity.loadName() || '');
+  const [name, setName] = useState(() => store.get().me.name || loadSavedCreds()?.name || identity.loadName() || '');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [noticesOpen, setNoticesOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
@@ -192,7 +208,9 @@ export function TitleScreen() {
   const valid = isValidName(name);
   // 账号体系（a5 移植，accounts-port/NOTES2.md）：标题页「代号 + 密码」，登录/注册成功后把 30 天票据交给 net.js 的
   // hello。`/api/account/state` = { enabled }；未开账号的服务器上这段不产生任何账号 DOM（行为与 forge 原生一致）。
-  const [password, setPassword] = useState('');
+  const [savedCred] = useState(() => loadSavedCreds());
+  const [password, setPassword] = useState(() => savedCred?.password || '');
+  const [remember, setRemember] = useState(() => !!savedCred);
   const [mode, setMode] = useState('login');
   const [busy, setBusy] = useState(false);
   const [accountError, setAccountError] = useState('');
@@ -225,6 +243,7 @@ export function TitleScreen() {
         return;
       }
       saveAccountAuth({ ticket: json.ticket, name: json.name || name });
+      saveSavedCreds(remember ? { name: json.name || name, password } : null);
       if (!enterSession(json.name || name)) setAccountError(t('代号不合法'));
     } catch {
       setAccountError(t('无法连接服务器'));
@@ -235,6 +254,12 @@ export function TitleScreen() {
   const start = () => {
     if (!valid) { toast(t('请输入博士代号'), 'warn'); return; }
     enterSession(name);
+  };
+  // 取消勾选就立刻清掉本机保存的密码（不等下次登录）。
+  const onRememberChange = (event) => {
+    const on = !!event.currentTarget.checked;
+    setRemember(on);
+    if (!on) saveSavedCreds(null);
   };
 
   const online = conn.status === 'online' || conn.status === 'connected';
@@ -307,6 +332,9 @@ export function TitleScreen() {
             <button type="button" class="title-account-switch tapx" disabled=${busy}
               onClick=${() => { setAccountError(''); setMode(mode === 'register' ? 'login' : 'register'); }}>
               ${mode === 'register' ? t('已有账号？登录') : t('没有账号？注册')}</button>
+            <label class="title-remember">
+              <input type="checkbox" checked=${remember} disabled=${busy} onChange=${onRememberChange} />
+              <span>${t('记住账号密码')}</span></label>
             ${accountError ? html`<span class="title-account-error">${accountError}</span>` : null}
           </div>` : html`<${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>${t('开始')}<//>`}
         ${/*
@@ -322,7 +350,6 @@ export function TitleScreen() {
           <span class=${`status-dot ${dotClass}`}></span>
           <span>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
           ${conn.status === 'online' ? html`<${PingPill} ms=${conn.ping} />` : null}
-          <${GuideButton} class="title-guide" label=${t('玩法说明')} />
           <button type="button" class="title-settings fsbtn tapx" aria-label=${t('设置')} title=${t('设置')}
             onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
           <${FullscreenButton} class="title-fs" />

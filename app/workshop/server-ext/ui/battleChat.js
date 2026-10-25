@@ -55,6 +55,8 @@ function roomFacts() {
     present: !!room,
     mode,
     spectating,
+    // 单人模拟（独立模拟）没有别的玩家：这个面板没有意义，整块不画（维护者 2026-10-25）。
+    solo: !!room && room.mode === 'solo',
     // 本面板只有打字输入（没有快捷短语那一条），所以 `'quick'` 模式也说不了
     canType: !!room && mode === 'open' && !spectating,
   };
@@ -133,6 +135,9 @@ function BattleChat({ net, session }) {
     setDraft('');                        // 乐观清空：与房内聊天同一条（失败时服务端会回一条错误，面板不去猜）
     session.send('room.chat', { text }); // 引擎消息那条路（`ctx.session.send`），不是 `ctx.net.send` 的包通道
   };
+
+  // 单人模拟里没有房间聊天：连折叠态的「聊天」芯片一起不画（维护者 2026-10-25「去除单人模拟左下角的聊天按钮」）。
+  if (facts.solo) return null;
 
   if (!open) {
     return html`

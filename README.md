@@ -123,3 +123,8 @@ LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
 > [!NOTE]
 > 本仓库是**开箱即用整合包**的镜像：上游游戏本体 + 两个社区工坊 mod 一并打包，方便直接下载运行。
+
+
+## 5服线上同步：2026-10-25
+
+此部署分支已同步5服最新线上源码与内容；快照来源、验证结果、UI资源恢复与排除项见[线上同步记录](app/docs/deployments/sp5-production-20261025.md)。

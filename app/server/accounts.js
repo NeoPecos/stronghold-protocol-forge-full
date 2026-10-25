@@ -11,7 +11,7 @@ export const REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
 /** 令牌是 256 位随机串，用确定性哈希存库即可（它不是口令，无需 scrypt；也避免每次连接都跑一遍昂贵派生）。 */
 const rememberHash = (token) => createHash('sha256').update(token).digest('hex');
 /** 账号画像里持久保存的局外选择（与 server/net.js 的 session 字段同名；avatar = 玩家头像 TASK-004）。 */
-export const PROFILE_KEYS = Object.freeze(['loadout', 'ops', 'skins', 'notOwned', 'diy', 'avatar']);
+export const PROFILE_KEYS = Object.freeze(['loadout', 'ops', 'skins', 'notOwned', 'diy', 'avatar', 'dlc', 'contracts']);
 /**
  * 管理员角色（TASK-065；维护者 2026-10-17 只给「草莓」一个账号）。
  *
@@ -276,7 +276,9 @@ export class AccountStore {
       if (!Object.prototype.hasOwnProperty.call(patch, field)) continue;
       const value = patch[field];
       if (value == null) continue;
-      if (typeof value === 'object' && Object.keys(value).length === 0 && current[field] != null) continue;
+      // 空对象 = 「这台设备没有状态」的握手噪声，忽略；空**数组** = 明确清空（DLC 全关 / 合约全不选）——
+      // `dlc` / `contracts` 是两个数组字段，不认它的话「上一局全关掉」永远记不住。
+      if (typeof value === 'object' && Object.keys(value).length === 0 && !Array.isArray(value) && current[field] != null) continue;
       if (JSON.stringify(next[field] ?? null) === JSON.stringify(value)) continue;
       next[field] = value;
       changed = true;
